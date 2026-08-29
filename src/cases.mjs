@@ -68,11 +68,14 @@ function createCaseStore(casesPath = DEFAULT_CASES_PATH) {
   }
 
   /**
-   * Ensures a case exists for every real trigger, and auto-resolves a
-   * still-"detected" case whose trigger has genuinely cleared (e.g. the
-   * FDA shortage record disappeared). A case already in approval_required
-   * or already resolved is left alone — a live-data blip must never undo
-   * a real human decision or a genuinely completed review.
+   * Ensures a case exists for every real trigger, refreshes a still-
+   * "detected" case's evidence when the underlying real data has changed
+   * (otherwise a case's displayed evidence silently goes stale the moment
+   * anything - the FDA status, an update date - moves), and auto-resolves
+   * a "detected" case whose trigger has genuinely cleared (e.g. the FDA
+   * shortage record disappeared). A case already in approval_required or
+   * already resolved is left alone in both respects — a live-data blip
+   * must never undo a real human decision or a genuinely completed review.
    */
   async function reconcileCases(triggers) {
     const cases = await loadCases();
@@ -81,8 +84,16 @@ function createCaseStore(casesPath = DEFAULT_CASES_PATH) {
     for (const trigger of triggers) {
       const key = triggerKey(trigger);
       seenKeys.add(key);
-      if (!cases.some((c) => triggerKey(c) === key)) {
+      const existing = cases.find((c) => triggerKey(c) === key);
+      if (!existing) {
         cases.push(caseFromTrigger(trigger, nextCaseId(cases)));
+      } else if (existing.status === "detected") {
+        const fresh = { triggerSummary: trigger.summary, priority: trigger.priority, evidence: trigger.evidence };
+        const changed = ["triggerSummary", "priority"].some((k) => existing[k] !== fresh[k]) ||
+          JSON.stringify(existing.evidence) !== JSON.stringify(fresh.evidence);
+        if (changed) {
+          Object.assign(existing, fresh, { updatedAt: new Date().toISOString() });
+        }
       }
     }
 

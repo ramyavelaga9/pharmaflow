@@ -12,8 +12,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEMO_DATA_PATH = path.join(__dirname, "..", "data", "demo-fda-shortages.json");
+const DEMO_SHORTAGES_PATH = path.join(__dirname, "..", "data", "demo-fda-shortages.json");
+const DEMO_RECALLS_PATH = path.join(__dirname, "..", "data", "demo-fda-recalls.json");
 const OPENFDA_SHORTAGES_URL = "https://api.fda.gov/drug/shortages.json";
+const OPENFDA_RECALLS_URL = "https://api.fda.gov/drug/enforcement.json";
 const REQUEST_TIMEOUT_MS = 6000;
 
 // Salt/form suffixes openFDA generic names carry that our synthetic panel's
@@ -54,6 +56,15 @@ function shortageGenericName(record) {
   return record?.openfda?.generic_name?.[0] ?? record?.generic_name ?? "";
 }
 
+/** A recall's `status` is "Ongoing" while active, "Terminated" once the firm has resolved it. */
+function isActiveRecall(record) {
+  return String(record?.status ?? "").toLowerCase() === "ongoing";
+}
+
+function recallGenericName(record) {
+  return record?.openfda?.generic_name?.[0] ?? "";
+}
+
 /**
  * openFDA reports dates as "MM/DD/YYYY" strings, which do NOT sort correctly
  * as plain strings (e.g. "09/08/2025" would lexicographically outrank
@@ -69,7 +80,12 @@ function parseShortageDate(dateStr) {
 }
 
 async function loadDemoShortages() {
-  const raw = await readFile(DEMO_DATA_PATH, "utf-8");
+  const raw = await readFile(DEMO_SHORTAGES_PATH, "utf-8");
+  return JSON.parse(raw).map((r) => ({ ...r, source: "demo" }));
+}
+
+async function loadDemoRecalls() {
+  const raw = await readFile(DEMO_RECALLS_PATH, "utf-8");
   return JSON.parse(raw).map((r) => ({ ...r, source: "demo" }));
 }
 
@@ -117,12 +133,34 @@ async function getRecentShortageUpdates(limit = 5, { fetchImpl = fetch } = {}) {
   return records.filter(isActiveShortage).slice(0, limit);
 }
 
+/**
+ * Search current FDA recall (enforcement) records for a drug name. Only
+ * "Ongoing" recalls are returned - a terminated one is history, not an
+ * active risk, and openFDA's search is loose enough that a combination
+ * product (e.g. a metformin + X pill) can come back for a plain
+ * "metformin" query; namesMatch's exact-after-normalization check filters
+ * those out rather than reporting a recall on the wrong product.
+ */
+async function searchDrugRecalls(drugName, { fetchImpl = fetch } = {}) {
+  const url = `${OPENFDA_RECALLS_URL}?search=openfda.generic_name:"${encodeURIComponent(drugName)}"&limit=10`;
+  let records;
+  try {
+    records = await fetchOpenFda(url, fetchImpl);
+  } catch {
+    records = await loadDemoRecalls();
+  }
+  return records.filter((r) => isActiveRecall(r) && namesMatch(drugName, recallGenericName(r)));
+}
+
 export {
   normalizeDrugName,
   namesMatch,
   isActiveShortage,
+  isActiveRecall,
   shortageGenericName,
+  recallGenericName,
   parseShortageDate,
   searchDrugShortages,
   getRecentShortageUpdates,
+  searchDrugRecalls,
 };

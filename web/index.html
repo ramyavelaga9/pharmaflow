@@ -43,6 +43,7 @@
       <header class="topbar">
         <nav class="view-tabs" role="tablist" aria-label="Dashboard view">
           <button class="view-tab active" data-view="patient-panel" role="tab" aria-selected="true">Patient Panel</button>
+          <button class="view-tab" data-view="drug-panel" role="tab" aria-selected="false">Drug Panel</button>
           <button class="view-tab" data-view="mission-control" role="tab" aria-selected="false">Mission Control</button>
         </nav>
         <button id="chat-toggle" class="chat-toggle"><i class="ph ph-chats-circle"></i> Open Agent</button>
@@ -57,13 +58,19 @@
         <section id="agent-status-strip" class="status-strip">
           <div class="status-strip-head">
             <span class="dot dot-ok" aria-hidden="true"></span>
-            <strong>PharmaFlow is monitoring</strong>
+            <strong>PharmaFlow active</strong>
+            <span class="status-strip-scan muted small">Last scan: <span id="status-last-scan">not yet</span></span>
           </div>
           <div class="status-strip-rows">
-            <div class="status-row"><span>FDA signals</span><span id="status-fda">Not yet checked</span></div>
-            <div class="status-row"><span>Prescriptions</span><span id="status-prescriptions">Not yet checked</span></div>
+            <div class="status-row"><i id="status-fda-icon" class="ph ph-circle-dashed"></i><span>FDA signals</span><span id="status-fda">Not yet checked</span></div>
+            <div class="status-row"><i id="status-prescriptions-icon" class="ph ph-circle-dashed"></i><span>Prescriptions</span><span id="status-prescriptions">Not yet checked</span></div>
+            <div class="status-row status-row-untracked"><i class="ph ph-minus-circle"></i><span>Pharmacy inventory</span><span class="muted">Not tracked in this prototype</span></div>
           </div>
           <div id="status-attention" class="status-attention muted small">Checking for cases that need attention...</div>
+        </section>
+
+        <section id="supply-risk-banner" class="supply-banner">
+          <div class="skeleton-row"></div>
         </section>
 
         <section id="alerts-section" class="alerts-grid">
@@ -87,19 +94,45 @@
               <div class="skeleton-row"></div>
             </div>
           </div>
-          <div class="alert-card">
-            <div class="alert-card-head">
-              <span class="dot dot-warn" aria-hidden="true"></span>
-              <h2>Medication supply risk</h2>
-            </div>
-            <div id="supply-risk-alerts" class="alert-list">
-              <div class="skeleton-row"></div>
-              <div class="skeleton-row"></div>
-            </div>
-          </div>
         </section>
 
         <section id="patient-detail" class="patient-detail hidden"></section>
+      </div>
+
+      <div id="view-drug-panel" class="view hidden">
+        <div class="view-heading">
+          <h1>Drug Panel</h1>
+          <p class="muted">Every medication on the panel, its real FDA shortage/recall status, and who's affected.</p>
+        </div>
+
+        <section class="stat-grid">
+          <div class="stat-tile">
+            <div class="stat-value" id="drug-stat-tracked">&ndash;</div>
+            <div class="stat-label">Drugs tracked</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-value" id="drug-stat-shortages">&ndash;</div>
+            <div class="stat-label">Active shortages</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-value" id="drug-stat-recalls">&ndash;</div>
+            <div class="stat-label">Active recalls</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-value" id="drug-stat-patients">&ndash;</div>
+            <div class="stat-label">Patients affected</div>
+          </div>
+        </section>
+
+        <section class="mission-card">
+          <h2><i class="ph ph-pill"></i> Medications</h2>
+          <div id="drug-list" class="case-list">
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+          </div>
+        </section>
+
+        <section id="drug-detail" class="mission-card hidden"></section>
       </div>
 
       <div id="view-mission-control" class="view hidden">

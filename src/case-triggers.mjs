@@ -17,7 +17,12 @@ function triggerFromSupplyRisk(alert) {
     medicationName: alert.medicationName,
     priority: "high",
     summary: `FDA shortage: ${alert.status}`,
-    evidence: { source: alert.source, status: alert.status, updateDate: alert.updateDate },
+    evidence: {
+      source: alert.source,
+      status: alert.status,
+      updateDate: alert.updateDate,
+      daysUntilDue: alert.daysUntilDue,
+    },
   };
 }
 

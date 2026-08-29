@@ -1,0 +1,15 @@
+[
+  {
+    "status": "Ongoing",
+    "classification": "Class II",
+    "openfda": { "generic_name": ["METFORMIN HYDROCHLORIDE"], "brand_name": ["GLUCOPHAGE"] },
+    "recalling_firm": "Demo Pharma Co.",
+    "reason_for_recall": "CGMP deviations: intermittent exposure to temperature excursion during storage.",
+    "voluntary_mandated": "Voluntary: Firm initiated",
+    "distribution_pattern": "Nationwide USA",
+    "product_description": "Metformin Hydrochloride Tablets, USP, 500 mg, 100 tablets per bottle",
+    "recall_initiation_date": "20260601",
+    "report_date": "20260615",
+    "_demoNote": "Synthetic fixture for offline/demo mode - not a real FDA record."
+  }
+]

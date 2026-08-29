@@ -9,6 +9,7 @@ const supplyAlert = {
   status: "To Be Discontinued",
   updateDate: "09/08/2025",
   source: "fda_live",
+  daysUntilDue: 6,
 };
 
 const highInteraction = {
@@ -44,4 +45,5 @@ test("each trigger carries its real evidence, not a summary that loses the sourc
   const [trigger] = triggersFromAlerts([supplyAlert], []);
   assert.equal(trigger.evidence.source, "fda_live");
   assert.equal(trigger.evidence.status, "To Be Discontinued");
+  assert.equal(trigger.evidence.daysUntilDue, 6, "the patient's real supply position, not an invented number");
 });

@@ -324,6 +324,9 @@ button:active {
   font-size: 13px;
   margin-bottom: 10px;
 }
+.status-strip-scan {
+  margin-left: auto;
+}
 .status-strip-rows {
   display: flex;
   flex-wrap: wrap;
@@ -337,6 +340,9 @@ button:active {
   font-size: 12px;
   color: var(--text-secondary);
 }
+.status-row i { color: var(--text-tertiary); font-size: 13px; }
+.status-row i.ph-check-circle { color: var(--ok); }
+.status-row-untracked { opacity: 0.7; }
 .status-row span:last-child {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
@@ -361,6 +367,48 @@ button:active {
   transition: transform 0.15s ease, opacity 0.15s ease;
 }
 .chat-toggle:hover { opacity: 0.92; }
+
+/* ---- Supply-risk banner: the primary story, one summary not a list ---- */
+.supply-banner {
+  margin-bottom: 20px;
+}
+.supply-banner-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  background: var(--danger-soft);
+  border: none;
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.supply-banner-inner:hover { filter: brightness(0.97); }
+.supply-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--danger);
+}
+.supply-banner-stats {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.supply-banner-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-right: 4px;
+}
 
 .alerts-grid {
   display: grid;
@@ -401,6 +449,24 @@ button:active {
   padding: 9px 10px;
   border-radius: var(--radius-input);
   background: var(--surface-sunken);
+  /* Resets for when this is rendered as a <button> (a real, case-backed alert) */
+  width: 100%;
+  border: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.alert-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.alert-row-clickable:hover { background: var(--surface); box-shadow: 0 0 0 1px var(--border) inset; }
+.alert-row-pills {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
 }
 .alert-row-main {
   min-width: 0;
@@ -804,6 +870,44 @@ button:active {
   gap: 8px;
   margin: 10px 0 18px;
 }
+
+/* A real, honest 3-stage stepper - not a preview of the 8-stage pipeline. */
+.case-lifecycle {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.lifecycle-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.lifecycle-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+}
+.lifecycle-step.done .lifecycle-dot { background: var(--ok); border-color: var(--ok); }
+.lifecycle-step.current .lifecycle-dot { background: var(--warn); border-color: var(--warn); }
+.lifecycle-label {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.lifecycle-step.done .lifecycle-label,
+.lifecycle-step.current .lifecycle-label { color: var(--text-primary); font-weight: 500; }
+.lifecycle-connector {
+  height: 2px;
+  flex: 1;
+  background: var(--border);
+  margin: 0 6px;
+}
+.lifecycle-connector.done { background: var(--ok); }
+
 .case-evidence h3,
 .review-note h3 {
   font-size: 12px;

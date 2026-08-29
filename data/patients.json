@@ -3,7 +3,11 @@
     "id": "p1",
     "name": "Eleanor Whitfield",
     "age": 74,
-    "conditions": ["Atrial Fibrillation", "Type 2 Diabetes", "Hypertension"],
+    "conditions": [
+      "Atrial Fibrillation",
+      "Type 2 Diabetes",
+      "Hypertension"
+    ],
     "medications": [
       {
         "id": "p1-m1",
@@ -13,7 +17,23 @@
         "daysSupply": 30,
         "lastFilled": "2026-08-03",
         "prescriber": "Dr. Nkemelu (Cardiology)",
-        "adherenceLog": [true, true, true, false, true, true, true, true, false, true, true, true, true, true]
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
       },
       {
         "id": "p1-m2",
@@ -23,7 +43,22 @@
         "daysSupply": 90,
         "lastFilled": "2026-06-18",
         "prescriber": "Dr. Patel (Endocrinology)",
-        "adherenceLog": [true, true, true, true, true, true, true, true, true, true, true, true, true, true]
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
       },
       {
         "id": "p1-m3",
@@ -33,7 +68,22 @@
         "daysSupply": 30,
         "lastFilled": "2026-08-01",
         "prescriber": "Dr. Nkemelu (Cardiology)",
-        "adherenceLog": [true, false, true, true, false, true, true, false, true, true, false, true, true, true]
+        "adherenceLog": [
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true
+        ]
       },
       {
         "id": "p1-m4",
@@ -43,7 +93,22 @@
         "daysSupply": 30,
         "lastFilled": "2026-08-20",
         "prescriber": "Self / OTC (patient-reported)",
-        "adherenceLog": [false, false, true, false, false, false, true, false, false, false, false, false, false, false]
+        "adherenceLog": [
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
       }
     ]
   },
@@ -51,7 +116,10 @@
     "id": "p2",
     "name": "Marcus Chen",
     "age": 58,
-    "conditions": ["Chronic Kidney Disease (Stage 3)", "Hypertension"],
+    "conditions": [
+      "Chronic Kidney Disease (Stage 3)",
+      "Hypertension"
+    ],
     "medications": [
       {
         "id": "p2-m1",
@@ -61,7 +129,22 @@
         "daysSupply": 30,
         "lastFilled": "2026-07-31",
         "prescriber": "Dr. Osei (Nephrology)",
-        "adherenceLog": [true, true, true, true, true, true, true, true, true, true, true, true, true, true]
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
       },
       {
         "id": "p2-m2",
@@ -71,7 +154,22 @@
         "daysSupply": 30,
         "lastFilled": "2026-08-10",
         "prescriber": "Self / OTC (patient-reported)",
-        "adherenceLog": [true, false, true, true, false, false, true, false, false, true, false, false, true, false]
+        "adherenceLog": [
+          true,
+          false,
+          true,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          true,
+          false
+        ]
       },
       {
         "id": "p2-m3",
@@ -81,7 +179,22 @@
         "daysSupply": 30,
         "lastFilled": "2026-07-29",
         "prescriber": "Dr. Osei (Nephrology)",
-        "adherenceLog": [true, true, false, true, true, true, false, true, true, true, false, true, true, true]
+        "adherenceLog": [
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true
+        ]
       }
     ]
   },
@@ -89,7 +202,10 @@
     "id": "p3",
     "name": "Priya Ramaswami",
     "age": 41,
-    "conditions": ["Major Depressive Disorder", "Migraine"],
+    "conditions": [
+      "Major Depressive Disorder",
+      "Migraine"
+    ],
     "medications": [
       {
         "id": "p3-m1",
@@ -99,7 +215,22 @@
         "daysSupply": 30,
         "lastFilled": "2026-08-05",
         "prescriber": "Dr. Falk (Psychiatry)",
-        "adherenceLog": [true, true, true, true, true, true, true, true, true, true, true, true, true, true]
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
       },
       {
         "id": "p3-m2",
@@ -109,7 +240,22 @@
         "daysSupply": 9,
         "lastFilled": "2026-08-02",
         "prescriber": "Dr. Falk (Psychiatry)",
-        "adherenceLog": [true, false, false, true, false, false, false, true, false, false, false, false, true, false]
+        "adherenceLog": [
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false
+        ]
       }
     ]
   }

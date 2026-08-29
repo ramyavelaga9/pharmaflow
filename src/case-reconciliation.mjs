@@ -36,6 +36,9 @@ async function computeSupplyRiskAlerts() {
           status: record.status,
           updateDate: record.update_date,
           source: record.source,
+          // The patient's own real supply position, not FDA data - lets the
+          // UI show "6 days remaining" without inventing a number.
+          daysUntilDue: store.refillStatus(m).daysUntilDue,
         });
       }
     }

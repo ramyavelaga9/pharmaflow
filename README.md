@@ -22,10 +22,13 @@ with a human in the loop) is the hard part. PharmaFlow's agent:
   lookups) — the agent has to call them, it can't invent a patient's
   medication list, a case id, or a shortage that doesn't exist.
 - **Uses real external data, honestly labeled.** `src/fda.mjs` queries
-  openFDA's live shortage API and falls back to a small, clearly labeled
-  demo fixture only when the live API is genuinely unreachable — every
-  record carries `source: "fda_live" | "demo"` so nothing downstream can
-  blur a synthetic fallback into a live FDA claim.
+  openFDA's live shortage *and* recall (enforcement) APIs and falls back to
+  a small, clearly labeled demo fixture only when the live API is
+  genuinely unreachable — every record carries `source: "fda_live" | "demo"`
+  so nothing downstream can blur a synthetic fallback into a live FDA
+  claim. Only *active* records count (`status: "Ongoing"` for a recall,
+  not-yet-resolved for a shortage) — a terminated recall is history, not
+  a live one.
 - **Follows a written procedure**, not just a system prompt. The
   `medication-continuity` and `shortage-analysis` skills
   (`skills/*/SKILL.md`) are git-backed instruction packs TrueForge loads
@@ -145,12 +148,14 @@ npm run setup
 npm run backend
 ```
 
-Open **http://localhost:8787** for the PharmaFlow dashboard — a
-**Patient Panel** tab (a live agent-status strip, refill/interaction/
-supply-risk alerts, an "Open Agent" chat drawer) and a **Mission Control**
-tab (real case list with case detail + approve/reject, a live event feed,
-and the agent's current execution path) — or the TrueForge chat UI
-directly at **http://localhost:8790**.
+Open **http://localhost:8787** for the PharmaFlow dashboard: a
+**Patient Panel** tab (a live agent-status strip, a supply-risk summary,
+refill/interaction alerts, an "Open Agent" chat drawer), a **Drug Panel**
+tab (every medication on the panel with its real active FDA shortage/recall
+status and who's affected - click a drug for full detail), and a
+**Mission Control** tab (real case list with case detail + approve/reject,
+a live event feed, and the agent's current execution path) — or the
+TrueForge chat UI directly at **http://localhost:8790**.
 
 `npm run setup` is safe to re-run any time (e.g. after adding a real API
 key, or once the skills' GitHub URL is set via
@@ -177,11 +182,12 @@ and arguments.
 ## Project layout
 
 ```
-data/                          mock patient panel, interaction table, demo FDA fixture, cases
+data/                          mock patient panel, interaction table, demo FDA fixtures, cases
 skills/medication-continuity/  agent procedure: refills, interactions, adherence, escalation
 skills/shortage-analysis/      agent procedure: FDA shortages, never infer a substitution
 src/store.mjs                  shared data layer (refill math, interactions, adherence, panel stats)
-src/fda.mjs                    openFDA shortage lookups, with the live/demo fallback
+src/fda.mjs                    openFDA shortage + recall lookups, with the live/demo fallback
+src/drug-panel.mjs             drug-centric view: real patients per drug, shortage/recall status
 src/cases.mjs                  case store: reconciliation, approval request/resolution
 src/case-triggers.mjs          pure: real alerts -> case triggers (supply-risk, high interactions)
 src/case-reconciliation.mjs    shared by backend + MCP server: live alerts -> reconciled cases

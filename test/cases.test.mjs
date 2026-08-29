@@ -36,6 +36,24 @@ test("reconcileCases creates a case for a new real trigger", () =>
     assert.match(cases[0].id, /^PF-\d+$/);
   }));
 
+test("reconcileCases refreshes a still-open case's evidence when the real data changes", () =>
+  withTempCaseStore(async (store) => {
+    await store.reconcileCases([supplyTrigger]);
+    const updatedTrigger = { ...supplyTrigger, evidence: { ...supplyTrigger.evidence, status: "Resolved" } };
+    const [refreshed] = await store.reconcileCases([updatedTrigger]);
+    assert.equal(refreshed.evidence.status, "Resolved", "a still-open case must not display stale evidence");
+    assert.equal(refreshed.status, "detected", "refreshing evidence must not itself change the case's status");
+  }));
+
+test("reconcileCases never refreshes a case awaiting approval or already resolved, even if the trigger changes", () =>
+  withTempCaseStore(async (store) => {
+    const [created] = await store.reconcileCases([supplyTrigger]);
+    await store.requestApprovalForCase(created.id, { toolCallId: "tc1", threadId: "th1", sessionId: "s1" });
+    const updatedTrigger = { ...supplyTrigger, evidence: { ...supplyTrigger.evidence, status: "Resolved" } };
+    const [unchanged] = await store.reconcileCases([updatedTrigger]);
+    assert.equal(unchanged.evidence.status, "To Be Discontinued", "a pending human decision must be based on stable evidence");
+  }));
+
 test("reconcileCases does not duplicate a case for the same recurring trigger", () =>
   withTempCaseStore(async (store) => {
     await store.reconcileCases([supplyTrigger]);

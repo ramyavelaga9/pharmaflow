@@ -5,6 +5,7 @@ const state = {
   activePatientId: null,
   activeCaseId: null,
   cases: [],
+  drugs: [],
   refillAlerts: [],
   interactionAlerts: [],
   supplyRiskAlerts: [],
@@ -77,11 +78,24 @@ function refillDotClass(status) {
 
 // ---- Agent status strip (Patient Panel): real, never a placeholder ----
 
+function setCheckedIcon(iconId, checked) {
+  el(iconId).className = checked ? "ph ph-check-circle" : "ph ph-circle-dashed";
+}
+
 async function loadAgentStatus() {
   try {
     const status = await fetchJSON("/api/agent-status");
     el("status-fda").textContent = formatRelativeTime(status.lastChecked.fda);
     el("status-prescriptions").textContent = formatRelativeTime(status.lastChecked.prescriptions);
+    setCheckedIcon("status-fda-icon", Boolean(status.lastChecked.fda));
+    setCheckedIcon("status-prescriptions-icon", Boolean(status.lastChecked.prescriptions));
+
+    // "Last scan" is whichever real check happened most recently - never a
+    // separate, independently-fabricated timestamp.
+    const timestamps = [status.lastChecked.fda, status.lastChecked.prescriptions].filter(Boolean);
+    const mostRecent = timestamps.length ? timestamps.sort().at(-1) : null;
+    el("status-last-scan").textContent = mostRecent ? formatRelativeTime(mostRecent) : "not yet";
+
     el("status-attention").textContent = status.casesRequiringAttention
       ? `${status.casesRequiringAttention} case${status.casesRequiringAttention === 1 ? "" : "s"} require attention`
       : "No cases currently require attention.";
@@ -137,21 +151,33 @@ function renderPatientList() {
 
 // ---- Overview: refill + interaction + supply-risk alerts ----
 
+/** An alert row that has a real backing case opens it; otherwise it's informational only (never a dead-looking click target). */
+function alertRowTag(kase) {
+  return kase ? "button" : "div";
+}
+function alertRowAttrs(kase) {
+  return kase ? `class="alert-row alert-row-clickable" data-goto-case="${escapeHtml(kase.id)}"` : `class="alert-row"`;
+}
+
 async function loadOverviewAlerts() {
   try {
     state.refillAlerts = await fetchJSON("/api/refill-alerts?days=14");
     el("refill-alerts").innerHTML = state.refillAlerts.length
       ? state.refillAlerts
-          .map(
-            (a) => `
+          .map((a) => {
+            const urgent = a.status === "overdue" || a.status === "critical";
+            return `
         <div class="alert-row">
           <span class="alert-row-main">
             <div class="alert-row-title">${escapeHtml(a.medicationName)} &middot; ${escapeHtml(a.patientName)}</div>
             <div class="alert-row-sub">${a.daysUntilDue < 0 ? `${Math.abs(a.daysUntilDue)}d overdue` : `due in ${a.daysUntilDue}d`}</div>
           </span>
-          <span class="pill ${refillPillClass(a.status)}">${refillStatusLabel(a.status)}</span>
-        </div>`
-          )
+          <span class="alert-row-pills">
+            <span class="pill ${refillPillClass(a.status)}">${refillStatusLabel(a.status)}</span>
+            ${urgent ? `<span class="pill pill-muted">Review recommended</span>` : ""}
+          </span>
+        </div>`;
+          })
           .join("")
       : `<div class="empty-note"><i class="ph ph-check-circle"></i> No refills due in the next two weeks.</div>`;
   } catch (err) {
@@ -162,16 +188,20 @@ async function loadOverviewAlerts() {
     state.interactionAlerts = await fetchJSON("/api/interaction-alerts");
     el("interaction-alerts").innerHTML = state.interactionAlerts.length
       ? state.interactionAlerts
-          .map(
-            (a) => `
-        <div class="alert-row">
+          .map((a) => {
+            // Only high-severity interactions become real cases (case-triggers.mjs) - a
+            // moderate one has nothing to open, so it stays a plain informational row.
+            const kase = a.severity === "high" ? findCaseForAlert(a.patientId, `${a.a} + ${a.b}`) : null;
+            const tag = alertRowTag(kase);
+            return `
+        <${tag} ${alertRowAttrs(kase)}>
           <span class="alert-row-main">
             <div class="alert-row-title">${escapeHtml(a.a)} + ${escapeHtml(a.b)} &middot; ${escapeHtml(a.patientName)}</div>
             <div class="alert-row-sub">Potential interaction detected &middot; pharmacist review recommended</div>
           </span>
-          <span class="pill ${a.severity === "high" ? "pill-danger" : "pill-warn"}">${a.severity}</span>
-        </div>`
-          )
+          <span class="pill ${kase ? caseStatusPillClass(kase.status) : a.severity === "high" ? "pill-danger" : "pill-warn"}">${kase ? caseStatusLabel(kase.status) : a.severity}</span>
+        </${tag}>`;
+          })
           .join("")
       : `<div class="empty-note"><i class="ph ph-check-circle"></i> No known interactions across the panel.</div>`;
   } catch (err) {
@@ -180,25 +210,42 @@ async function loadOverviewAlerts() {
 
   try {
     state.supplyRiskAlerts = await fetchJSON("/api/supply-risk");
-    el("supply-risk-alerts").innerHTML = state.supplyRiskAlerts.length
-      ? state.supplyRiskAlerts
-          .map(
-            (a) => `
-        <div class="alert-row">
-          <span class="alert-row-main">
-            <div class="alert-row-title">${escapeHtml(a.medicationName)} &middot; ${escapeHtml(a.patientName)}</div>
-            <div class="alert-row-sub">${escapeHtml(a.status)} &middot; ${a.source === "fda_live" ? "live FDA data" : "demo data"}</div>
-          </span>
-          <span class="pill ${a.source === "fda_live" ? "pill-danger" : "pill-warn"}">${a.source === "fda_live" ? "FDA" : "demo"}</span>
-        </div>`
-          )
-          .join("")
-      : `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortages match this panel's medications.</div>`;
+    renderSupplyRiskBanner();
   } catch (err) {
-    el("supply-risk-alerts").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+    el("supply-risk-banner").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
   }
 
   renderPatientList(); // now that alert data is in, refresh sidebar concern counts
+}
+
+/**
+ * A single prominent summary, not a per-row list - the doc's own framing is
+ * that supply risk is PharmaFlow's primary story, and the per-case detail
+ * (evidence, patient supply, approval) already lives one click away in
+ * Mission Control. Counts are real distinct patients/medications, and the
+ * only claim made - "FDA updates detected" - is one this data backs.
+ */
+function renderSupplyRiskBanner() {
+  const alerts = state.supplyRiskAlerts;
+  const banner = el("supply-risk-banner");
+
+  if (!alerts.length) {
+    banner.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortages match this panel's medications.</div>`;
+    return;
+  }
+
+  const patientCount = new Set(alerts.map((a) => a.patientId)).size;
+  const medCount = new Set(alerts.map((a) => a.medicationName)).size;
+
+  banner.innerHTML = `
+    <button class="supply-banner-inner" data-goto-mission-control>
+      <div class="supply-banner-head"><span class="dot dot-critical"></span><strong>Active supply risks</strong></div>
+      <div class="supply-banner-stats">
+        <div><span class="supply-banner-value">${patientCount}</span> patient${patientCount === 1 ? "" : "s"}</div>
+        <div><span class="supply-banner-value">${medCount}</span> medication${medCount === 1 ? "" : "s"}</div>
+        <div>FDA updates detected</div>
+      </div>
+    </button>`;
 }
 
 // ---- Patient detail ----
@@ -208,6 +255,7 @@ async function openPatient(id) {
   renderPatientList();
   el("alerts-section").classList.add("hidden");
   el("agent-status-strip").classList.add("hidden");
+  el("supply-risk-banner").classList.add("hidden");
   const detail = el("patient-detail");
   detail.classList.remove("hidden");
   detail.innerHTML = `<div class="skeleton-row"></div>`;
@@ -231,6 +279,7 @@ function backToOverview() {
   el("patient-detail").classList.add("hidden");
   el("alerts-section").classList.remove("hidden");
   el("agent-status-strip").classList.remove("hidden");
+  el("supply-risk-banner").classList.remove("hidden");
   el("view-title").textContent = "Medication Continuity Command Center";
   el("view-subtitle").textContent = "PharmaFlow is monitoring medication supply, refill, and safety signals across the patient panel.";
 }
@@ -387,6 +436,11 @@ function caseStatusPillClass(status) {
   return "pill-warn";
 }
 
+/** Finds the real case backing an alert, if one exists yet - used to make Patient Panel alerts open their case. */
+function findCaseForAlert(patientId, medicationName) {
+  return state.cases.find((c) => c.patientId === patientId && c.medicationName === medicationName) ?? null;
+}
+
 async function loadCases() {
   try {
     state.cases = await fetchJSON("/api/cases");
@@ -423,16 +477,41 @@ function renderCaseList() {
 
 function renderCaseEvidence(kase) {
   if (kase.triggerType === "supply_risk") {
+    const days = kase.evidence.daysUntilDue;
+    const supplyText =
+      days == null ? null : days < 0 ? `${Math.abs(days)} days past the patient's own supply` : `${days} days remaining`;
     return `
       <div class="evidence-row"><span>Source</span><span>${kase.evidence.source === "fda_live" ? "Live FDA data" : "Demo fixture"}</span></div>
       <div class="evidence-row"><span>FDA status</span><span>${escapeHtml(kase.evidence.status)}</span></div>
       ${kase.evidence.updateDate ? `<div class="evidence-row"><span>Updated</span><span>${escapeHtml(kase.evidence.updateDate)}</span></div>` : ""}
+      ${supplyText ? `<div class="evidence-row"><span>Patient supply</span><span>${escapeHtml(supplyText)}</span></div>` : ""}
+      <div class="evidence-row"><span>Pharmacy inventory</span><span class="muted">Not tracked in this prototype</span></div>
     `;
   }
   return `
     <div class="evidence-row"><span>Source</span><span>Synthetic interaction table</span></div>
     <div class="evidence-row"><span>Why it matters</span><span>${escapeHtml(kase.evidence.note)}</span></div>
   `;
+}
+
+/** A small, honest lifecycle stepper - three real stages, not a preview of the eight-stage pipeline that doesn't exist yet. */
+function renderCaseLifecycle(status) {
+  const stages = [
+    { key: "detected", label: "Detected" },
+    { key: "approval_required", label: "Approval required" },
+    { key: "resolved", label: "Resolved" },
+  ];
+  const currentIndex = stages.findIndex((s) => s.key === status);
+  return `
+    <div class="case-lifecycle">
+      ${stages
+        .map((s, i) => {
+          const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "pending";
+          const connector = i < stages.length - 1 ? `<span class="lifecycle-connector ${i < currentIndex ? "done" : ""}"></span>` : "";
+          return `<div class="lifecycle-step ${state}"><span class="lifecycle-dot"></span><span class="lifecycle-label">${s.label}</span></div>${connector}`;
+        })
+        .join("")}
+    </div>`;
 }
 
 function renderApprovalPanel(kase) {
@@ -471,6 +550,7 @@ function renderCaseDetail(kase) {
       <span class="pill pill-danger">${escapeHtml(kase.priority)} priority</span>
       <span class="pill ${caseStatusPillClass(kase.status)}">${caseStatusLabel(kase.status)}</span>
     </div>
+    ${renderCaseLifecycle(kase.status)}
     <div class="case-evidence">
       <h3>Evidence</h3>
       ${renderCaseEvidence(kase)}
@@ -517,6 +597,112 @@ async function respondToApproval(caseId, decision) {
     alert(`Couldn't submit decision: ${err.message}`);
     await openCase(caseId);
   }
+}
+
+// ---- Drug Panel: real FDA shortage/recall status per medication, and who it touches ----
+
+let activeDrugName = null;
+
+function formatFdaDate(yyyymmdd) {
+  const match = /^(\d{4})(\d{2})(\d{2})$/.exec(String(yyyymmdd ?? ""));
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return `${month}/${day}/${year}`;
+}
+
+async function loadDrugPanel() {
+  try {
+    state.drugs = await fetchJSON("/api/drugs");
+    const withShortage = state.drugs.filter((d) => d.shortage);
+    const withRecall = state.drugs.filter((d) => d.recall);
+    const affectedPatientIds = new Set(
+      [...withShortage, ...withRecall].flatMap((d) => d.patients.map((p) => p.id))
+    );
+    el("drug-stat-tracked").textContent = state.drugs.length;
+    el("drug-stat-shortages").textContent = withShortage.length;
+    el("drug-stat-recalls").textContent = withRecall.length;
+    el("drug-stat-patients").textContent = affectedPatientIds.size;
+    renderDrugList();
+  } catch (err) {
+    el("drug-list").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderDrugList() {
+  const container = el("drug-list");
+  if (!state.drugs.length) {
+    container.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No medications on the panel yet.</div>`;
+    return;
+  }
+  container.innerHTML = state.drugs
+    .map((d) => {
+      const pills = [
+        d.shortage ? `<span class="pill pill-danger">Shortage</span>` : "",
+        d.recall ? `<span class="pill pill-warn">${escapeHtml(d.recall.classification)} recall</span>` : "",
+        !d.shortage && !d.recall ? `<span class="pill pill-ok">No active issue</span>` : "",
+      ].join("");
+      return `
+      <button class="case-row ${d.name === activeDrugName ? "active" : ""}" data-open-drug="${escapeHtml(d.name)}">
+        <span class="case-row-main">
+          <div class="case-row-title">${escapeHtml(d.name)}</div>
+          <div class="case-row-sub">${d.patients.length} patient${d.patients.length === 1 ? "" : "s"} affected</div>
+        </span>
+        <span class="alert-row-pills">${pills}</span>
+      </button>`;
+    })
+    .join("");
+}
+
+function renderDrugDetail(drug) {
+  const patientsList = drug.patients
+    .map((p) => `<span class="condition-tag">${escapeHtml(p.name)}</span>`)
+    .join("");
+
+  const shortageBlock = drug.shortage
+    ? `
+      <h3>Active shortage</h3>
+      <div class="evidence-row"><span>Status</span><span>${escapeHtml(drug.shortage.status)}</span></div>
+      <div class="evidence-row"><span>Source</span><span>${drug.shortage.source === "fda_live" ? "Live FDA data" : "Demo fixture"}</span></div>
+      <div class="evidence-row"><span>Updated</span><span>${escapeHtml(drug.shortage.updateDate)}</span></div>`
+    : "";
+
+  const recallBlock = drug.recall
+    ? `
+      <h3>Active recall</h3>
+      <div class="evidence-row"><span>Classification</span><span>${escapeHtml(drug.recall.classification)}</span></div>
+      <div class="evidence-row"><span>Source</span><span>${drug.recall.source === "fda_live" ? "Live FDA data" : "Demo fixture"}</span></div>
+      <div class="evidence-row"><span>Recalled by</span><span>${escapeHtml(drug.recall.recallingFirm)}</span></div>
+      <div class="evidence-row"><span>Reason</span><span>${escapeHtml(drug.recall.reason)}</span></div>
+      <div class="evidence-row"><span>Distribution</span><span>${escapeHtml(drug.recall.distributionPattern)}</span></div>
+      <div class="evidence-row"><span>Product</span><span>${escapeHtml(drug.recall.productDescription)}</span></div>
+      <div class="evidence-row"><span>Initiated</span><span>${escapeHtml(formatFdaDate(drug.recall.initiatedDate) ?? "unknown")}</span></div>`
+    : "";
+
+  return `
+    <div class="patient-detail-head">
+      <div><h2>${escapeHtml(drug.name)}</h2></div>
+      <button class="icon-btn" id="close-drug-detail" aria-label="Close drug detail"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="condition-tags">${patientsList || `<span class="muted small">No patient currently prescribed this.</span>`}</div>
+    ${shortageBlock}
+    ${recallBlock}
+    ${!drug.shortage && !drug.recall ? `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortage or recall for this medication.</div>` : ""}
+  `;
+}
+
+function openDrug(name) {
+  const drug = state.drugs.find((d) => d.name === name);
+  activeDrugName = name;
+  renderDrugList();
+  const detail = el("drug-detail");
+  detail.classList.remove("hidden");
+  detail.innerHTML = drug ? renderDrugDetail(drug) : `<p class="error-note">Drug not found.</p>`;
+}
+
+function closeDrugDetail() {
+  activeDrugName = null;
+  el("drug-detail").classList.add("hidden");
+  renderDrugList();
 }
 
 async function loadEventFeed() {
@@ -571,10 +757,13 @@ function switchView(viewName) {
     tab.setAttribute("aria-selected", String(active));
   });
   el("view-patient-panel").classList.toggle("hidden", viewName !== "patient-panel");
+  el("view-drug-panel").classList.toggle("hidden", viewName !== "drug-panel");
   el("view-mission-control").classList.toggle("hidden", viewName !== "mission-control");
 
   if (viewName === "mission-control") startMissionControlPolling();
   else stopMissionControlPolling();
+
+  if (viewName === "drug-panel") loadDrugPanel();
 }
 
 document.querySelectorAll(".view-tab").forEach((tab) => {
@@ -597,12 +786,18 @@ el("chat-form").addEventListener("submit", (e) => {
 document.addEventListener("click", (e) => {
   if (e.target.closest("#back-to-overview")) return backToOverview();
   if (e.target.closest("#close-case-detail")) return closeCaseDetail();
+  if (e.target.closest("#close-drug-detail")) return closeDrugDetail();
+
+  const openDrugBtn = e.target.closest("[data-open-drug]");
+  if (openDrugBtn) return openDrug(openDrugBtn.dataset.openDrug);
 
   const gotoCase = e.target.closest("[data-goto-case]");
   if (gotoCase) {
     switchView("mission-control");
     return openCase(gotoCase.dataset.gotoCase);
   }
+
+  if (e.target.closest("[data-goto-mission-control]")) return switchView("mission-control");
 
   const approveBtn = e.target.closest("[data-approve]");
   if (approveBtn) return respondToApproval(approveBtn.dataset.approve, "allow");
@@ -611,7 +806,11 @@ document.addEventListener("click", (e) => {
   if (rejectBtn) return respondToApproval(rejectBtn.dataset.reject, "deny");
 });
 
+// Cases load (and reconcile against live data) before anything that reads
+// them: overview alerts need it to link a supply-risk row to its real
+// case from the very first paint, and agent-status needs it so "N cases
+// require attention" doesn't read a cases.json that hasn't been
+// reconciled yet and transiently disagree with the alerts right below it.
 loadPatientList();
-loadOverviewAlerts();
-loadAgentStatus();
+loadCases().then(() => Promise.all([loadOverviewAlerts(), loadAgentStatus()]));
 setInterval(loadAgentStatus, 5000);

@@ -4,9 +4,11 @@ import {
   normalizeDrugName,
   namesMatch,
   isActiveShortage,
+  isActiveRecall,
   parseShortageDate,
   searchDrugShortages,
   getRecentShortageUpdates,
+  searchDrugRecalls,
 } from "../src/fda.mjs";
 
 test("normalizeDrugName strips case and common salt-form suffixes", () => {
@@ -88,4 +90,52 @@ test("getRecentShortageUpdates falls back to demo data and respects the limit", 
   const results = await getRecentShortageUpdates(1, { fetchImpl });
   assert.equal(results.length, 1);
   assert.equal(results[0].source, "demo");
+});
+
+test("isActiveRecall is true only while a recall is Ongoing, not once Terminated", () => {
+  assert.equal(isActiveRecall({ status: "Ongoing" }), true);
+  assert.equal(isActiveRecall({ status: "Terminated" }), false);
+  assert.equal(isActiveRecall({}), false, "an unknown status must not default to active");
+});
+
+test("searchDrugRecalls filters out a combination product that merely contains the drug name (invalid input case)", () => {
+  const fetchImpl = async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({
+      results: [
+        {
+          status: "Ongoing",
+          classification: "Class II",
+          openfda: { generic_name: ["DAPAGLIFLOZIN AND METFORMIN HYDROCHLORIDE"] },
+        },
+        { status: "Ongoing", classification: "Class III", openfda: { generic_name: ["METFORMIN HYDROCHLORIDE"] } },
+      ],
+    }),
+  });
+  return searchDrugRecalls("Metformin", { fetchImpl }).then((results) => {
+    assert.equal(results.length, 1, "the combination product must not be reported as a Metformin recall");
+    assert.equal(results[0].classification, "Class III");
+  });
+});
+
+test("searchDrugRecalls falls back to labeled demo data when the live API is unreachable", async () => {
+  const fetchImpl = async () => {
+    throw new Error("network unreachable");
+  };
+  const results = await searchDrugRecalls("Metformin", { fetchImpl });
+  assert.ok(results.length > 0, "expected at least one demo recall for Metformin");
+  for (const r of results) assert.equal(r.source, "demo");
+});
+
+test("searchDrugRecalls excludes a Terminated recall even when the live API returns it", async () => {
+  const fetchImpl = async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({
+      results: [{ status: "Terminated", classification: "Class II", openfda: { generic_name: ["NAPROXEN SODIUM"] } }],
+    }),
+  });
+  const results = await searchDrugRecalls("Naproxen", { fetchImpl });
+  assert.deepEqual(results, []);
 });

@@ -19,6 +19,7 @@ import { createCaseStore } from "./cases.mjs";
 import { computeSupplyRiskAlerts, reconcileCasesFromLiveData } from "./case-reconciliation.mjs";
 import { describeToolServer, summarizeToolResult } from "./tool-telemetry.mjs";
 import { createToolCallAccumulator, resolveActualToolCall } from "./tool-call-accumulator.mjs";
+import { computeDrugPanel } from "./drug-panel.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
@@ -80,6 +81,18 @@ app.get("/api/supply-risk", async (_req, res) => {
     const alerts = await computeSupplyRiskAlerts();
     agentStatus.recordCheck("fda");
     res.json(alerts);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Drug-centric view: every medication actually prescribed on the panel,
+// which real patients take it, and its current FDA shortage/recall status.
+app.get("/api/drugs", async (_req, res) => {
+  try {
+    const drugs = await computeDrugPanel();
+    agentStatus.recordCheck("fda");
+    res.json(drugs);
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
