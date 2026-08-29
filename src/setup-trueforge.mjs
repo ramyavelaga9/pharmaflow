@@ -44,7 +44,10 @@ const MCP_SERVERS = [
 // default categories, so approval-gating doesn't depend on annotation
 // heuristics working out.
 const AGENT_MCP_SERVERS = [
-  { name: "pharmaflow-tools", require_approval_for_tools: ["create_pharmacist_review"] },
+  {
+    name: "pharmaflow-tools",
+    require_approval_for_tools: ["create_pharmacist_review", "propose_alternative_supply"],
+  },
   { name: "fda-shortages" },
 ];
 
@@ -58,6 +61,11 @@ const SKILLS = [
     name: "shortage-analysis",
     path: "skills/shortage-analysis",
     description: "Check whether a current FDA drug shortage affects any patient on the panel.",
+  },
+  {
+    name: "medication-fulfillment",
+    path: "skills/medication-fulfillment",
+    description: "Autonomously fulfill a detected supply-risk case: reorder from stock, or propose a vetted alternative.",
   },
 ];
 
@@ -77,7 +85,16 @@ interaction-risk issue, identified via its "PF-" case id) genuinely needs
 pharmacist attention, call create_pharmacist_review with that case id and a
 short, concrete note. This requires human approval and will pause until a
 person responds - never treat it as a routine next step, and never call it
-speculatively "just in case."`;
+speculatively "just in case."
+
+You may also be started automatically (with no user in the conversation)
+to fulfill a specific newly-detected supply-risk case. When that happens,
+follow the medication-fulfillment skill exactly: check real pharmacy
+inventory first, reorder automatically only if stock allows it, and if not,
+propose only a vetted alternative from the reference list (never invent
+one) and let TrueForge's approval gate pause for a pharmacist. Do the work
+via tools; keep any summary you produce short, since no one may be reading
+it in real time.`;
 
 async function call(method, path, body) {
   const res = await fetch(`${BASE_URL}${path}`, {

@@ -106,8 +106,20 @@
           <p id="view-subtitle" class="muted">Browse patients and their current refill, interaction, and supply-risk status.</p>
         </div>
 
-        <section id="supply-risk-banner" class="supply-banner">
-          <div class="skeleton-row"></div>
+        <section class="mission-card fulfillment-section">
+          <h2><i class="ph ph-package"></i> Supply fulfillment</h2>
+          <p class="muted small fulfillment-section-sub">
+            When an FDA shortage matches a patient's medication, PharmaFlow checks real pharmacy
+            inventory automatically. Enough stock reorders right away with no approval needed;
+            no stock triggers a vetted alternative that a pharmacist must approve before the
+            patient is notified and the order is placed.
+          </p>
+          <div id="fulfillment-list" class="fulfillment-list">
+            <div class="skeleton-row"></div>
+          </div>
+          <div id="fulfillment-event-feed" class="event-feed fulfillment-event-feed">
+            <p class="empty-note"><i class="ph ph-moon-stars"></i> No fulfillment activity yet.</p>
+          </div>
         </section>
 
         <section id="alerts-section" class="alerts-grid">

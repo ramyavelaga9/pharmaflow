@@ -213,48 +213,16 @@ async function loadOverviewAlerts() {
   }
 
   try {
+    // Still fetched for the sidebar's real per-patient concern counts, even
+    // though the old summary banner is gone - the live Supply Fulfillment
+    // section (renderFulfillmentList, driven by real case data) replaced it.
     state.supplyRiskAlerts = await fetchJSON("/api/supply-risk");
-    renderSupplyRiskBanner();
-  } catch (err) {
-    el("supply-risk-banner").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+  } catch {
+    // The Supply Fulfillment section surfaces its own real errors; this
+    // fetch only feeds sidebar counts, so a failure here degrades quietly.
   }
 
   renderPatientList(); // now that alert data is in, refresh sidebar concern counts
-}
-
-/**
- * A single prominent summary, not a per-row list - the doc's own framing is
- * that supply risk is PharmaFlow's primary story, and the per-case detail
- * (evidence, patient supply, approval) already lives one click away in
- * Mission Control. Counts are real distinct patients/medications, and the
- * only claim made - "FDA updates detected" - is one this data backs.
- */
-function renderSupplyRiskBanner() {
-  const alerts = state.supplyRiskAlerts;
-  const banner = el("supply-risk-banner");
-
-  if (!alerts.length) {
-    banner.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortages match this panel's medications.</div>`;
-    return;
-  }
-
-  const patientCount = new Set(alerts.map((a) => a.patientId)).size;
-  const medCount = new Set(alerts.map((a) => a.medicationName)).size;
-
-  banner.innerHTML = `
-    <button class="supply-banner-inner" data-goto-mission-control>
-      <div class="supply-banner-head">
-        <span class="supply-banner-icon"><i class="ph-fill ph-warning"></i></span>
-        <div>
-          <strong>Active supply risks</strong>
-          <div class="muted small">FDA updates require continuity follow-up</div>
-        </div>
-      </div>
-      <div class="supply-banner-stats">
-        <div class="supply-banner-stat"><span class="supply-banner-value">${patientCount}</span><span class="supply-banner-label">Patient${patientCount === 1 ? "" : "s"}</span></div>
-        <div class="supply-banner-stat"><span class="supply-banner-value">${medCount}</span><span class="supply-banner-label">Medication${medCount === 1 ? "" : "s"}</span></div>
-      </div>
-    </button>`;
 }
 
 // ---- Patient detail ----
@@ -263,7 +231,6 @@ async function openPatient(id) {
   state.activePatientId = id;
   renderPatientList();
   el("alerts-section").classList.add("hidden");
-  el("supply-risk-banner").classList.add("hidden");
   const detail = el("patient-detail");
   detail.classList.remove("hidden");
   detail.innerHTML = `<div class="skeleton-row"></div>`;
@@ -286,7 +253,6 @@ function backToOverview() {
   renderPatientList();
   el("patient-detail").classList.add("hidden");
   el("alerts-section").classList.remove("hidden");
-  el("supply-risk-banner").classList.remove("hidden");
   el("view-title").textContent = "Patient Panel";
   el("view-subtitle").textContent = "Browse patients and their current refill, interaction, and supply-risk status.";
 }
@@ -487,12 +453,14 @@ function renderCaseEvidence(kase) {
     const days = kase.evidence.daysUntilDue;
     const supplyText =
       days == null ? null : days < 0 ? `${Math.abs(days)} days past the patient's own supply` : `${days} days remaining`;
+    const stockChecked = kase.fulfillment?.lastCheckedStock ?? kase.fulfillment?.stockAtOrder;
+    const inventoryText = stockChecked != null ? `${stockChecked} units (synthetic pharmacy data)` : "Not yet checked";
     return `
       <div class="evidence-row"><span>Source</span><span>${kase.evidence.source === "fda_live" ? "Live FDA data" : "Demo fixture"}</span></div>
       <div class="evidence-row"><span>FDA status</span><span>${escapeHtml(kase.evidence.status)}</span></div>
       ${kase.evidence.updateDate ? `<div class="evidence-row"><span>Updated</span><span>${escapeHtml(kase.evidence.updateDate)}</span></div>` : ""}
       ${supplyText ? `<div class="evidence-row"><span>Patient supply</span><span>${escapeHtml(supplyText)}</span></div>` : ""}
-      <div class="evidence-row"><span>Pharmacy inventory</span><span class="muted">Not tracked in this prototype</span></div>
+      <div class="evidence-row"><span>Pharmacy inventory</span><span>${escapeHtml(inventoryText)}</span></div>
     `;
   }
   return `
@@ -522,15 +490,53 @@ function renderCaseLifecycle(status) {
 }
 
 function renderApprovalPanel(kase) {
+  const altName = kase.pendingApproval?.alternativeDrugName;
+  const note = kase.pendingApproval?.note;
+  const summary = altName
+    ? `PharmaFlow proposes switching <strong>${escapeHtml(kase.patientName)}</strong> from ${escapeHtml(kase.medicationName)} to <strong>${escapeHtml(altName)}</strong>, since ${escapeHtml(kase.medicationName)} is out of stock.`
+    : "PharmaFlow wants to create a pharmacist review for this case.";
   return `
     <div class="approval-panel">
       <div class="approval-panel-head"><i class="ph-fill ph-lock-key"></i> Human approval required</div>
-      <p>PharmaFlow wants to create a pharmacist review for this case. It will not proceed without a decision.</p>
+      <p>${summary} It will not proceed without a decision.</p>
+      ${note ? `<p class="muted small">${escapeHtml(note)}</p>` : ""}
       <div class="approval-actions">
         <button class="approve-btn" data-approve="${kase.id}"><i class="ph ph-check"></i> Approve</button>
         <button class="reject-btn" data-reject="${kase.id}"><i class="ph ph-x"></i> Reject</button>
       </div>
     </div>`;
+}
+
+/** Real fulfillment progress: an honest "investigating" note while a real background turn is in flight, or the actual order/notification result once one exists. */
+function renderFulfillmentSummary(kase) {
+  const f = kase.fulfillment;
+  if (!f) return "";
+  if (f.method === "auto_reorder") {
+    return `
+      <div class="review-note">
+        <h3>Fulfillment</h3>
+        <div class="evidence-row"><span>Action</span><span>Automatic reorder - sufficient stock, no approval needed</span></div>
+        <div class="evidence-row"><span>Order</span><span>${escapeHtml(f.orderId)} &middot; ${escapeHtml(f.quantity)}</span></div>
+        <div class="evidence-row"><span>Stock at order</span><span>${f.stockAtOrder} units</span></div>
+      </div>`;
+  }
+  if (f.method === "alternative_supply") {
+    return `
+      <div class="review-note">
+        <h3>Fulfillment</h3>
+        <div class="evidence-row"><span>Action</span><span>Switched to ${escapeHtml(f.alternativeDrug)} (pharmacist approved)</span></div>
+        <div class="evidence-row"><span>Order</span><span>${escapeHtml(f.orderId)}</span></div>
+        <div class="evidence-row"><span>Patient notified</span><span>${f.notifiedAt ? new Date(f.notifiedAt).toLocaleString() : "-"}</span></div>
+      </div>`;
+  }
+  if (f.status === "investigating") {
+    return `
+      <div class="review-note">
+        <h3>Fulfillment</h3>
+        <div class="evidence-row"><span>Status</span><span>PharmaFlow is checking pharmacy inventory automatically&hellip;</span></div>
+      </div>`;
+  }
+  return "";
 }
 
 function renderPharmacistReview(kase) {
@@ -563,6 +569,7 @@ function renderCaseDetail(kase) {
       ${renderCaseEvidence(kase)}
     </div>
     ${kase.status === "approval_required" ? renderApprovalPanel(kase) : ""}
+    ${renderFulfillmentSummary(kase)}
     ${kase.pharmacistReview ? renderPharmacistReview(kase) : ""}
   `;
 }
@@ -587,9 +594,12 @@ function closeCaseDetail() {
   renderCaseList();
 }
 
+/** Approve/reject can be triggered from Mission Control's case detail or Patient Panel's fulfillment row - refreshes whichever real UI is showing this case, not just one. */
 async function respondToApproval(caseId, decision) {
-  const detail = el("case-detail");
-  detail.innerHTML = `<div class="skeleton-row"></div><p class="muted small">Submitting ${decision === "allow" ? "approval" : "rejection"}...</p>`;
+  const missionShowingThisCase = state.activeCaseId === caseId && !el("case-detail").classList.contains("hidden");
+  if (missionShowingThisCase) {
+    el("case-detail").innerHTML = `<div class="skeleton-row"></div><p class="muted small">Submitting ${decision === "allow" ? "approval" : "rejection"}...</p>`;
+  }
   try {
     const res = await fetch("/api/chat/approval", {
       method: "POST",
@@ -598,12 +608,79 @@ async function respondToApproval(caseId, decision) {
     });
     await consumeSSE(res, {}); // side effects (case resolution) matter here, not the transcript
     await loadCases();
-    await openCase(caseId);
+    renderFulfillmentList();
+    if (missionShowingThisCase) await openCase(caseId);
     loadAgentStatus();
   } catch (err) {
     alert(`Couldn't submit decision: ${err.message}`);
-    await openCase(caseId);
+    if (missionShowingThisCase) await openCase(caseId);
   }
+}
+
+// ---- Patient Panel: live supply fulfillment, driven by the same real case data ----
+
+/** Describes a supply-risk case's real current fulfillment state - never a fabricated "processing" animation. */
+function describeFulfillmentState(kase) {
+  const f = kase.fulfillment;
+  if (kase.status === "resolved" && f?.method === "auto_reorder") {
+    return { label: "Order placed", tone: "pill-ok", detail: `${escapeHtml(f.drugName)} &middot; ${escapeHtml(f.quantity)} &middot; Order ${escapeHtml(f.orderId)} (${f.stockAtOrder} units were in stock)` };
+  }
+  if (kase.status === "resolved" && f?.method === "alternative_supply") {
+    return { label: "Fulfilled via alternative", tone: "pill-ok", detail: `Switched to <strong>${escapeHtml(f.alternativeDrug)}</strong> &middot; patient notified &middot; order ${escapeHtml(f.orderId)} placed` };
+  }
+  if (kase.status === "approval_required") {
+    return { label: "Approval required", tone: "pill-danger", detail: null };
+  }
+  if (kase.status === "detected" && kase.pharmacistReview?.decision === "denied") {
+    return { label: "Alternative declined", tone: "pill-warn", detail: `Pharmacist declined${kase.pharmacistReview.note ? `: ${escapeHtml(kase.pharmacistReview.note)}` : ""}. No further automatic action.` };
+  }
+  if (f?.status === "investigating") {
+    return { label: "Checking inventory", tone: "pill-warn", detail: "PharmaFlow is automatically checking real pharmacy stock for this medication&hellip;" };
+  }
+  return { label: "Detected", tone: "pill-warn", detail: "Queued for an automatic inventory check." };
+}
+
+function renderFulfillmentRow(kase) {
+  const { label, tone, detail } = describeFulfillmentState(kase);
+  return `
+    <div class="fulfillment-row">
+      <div class="case-row-main">
+        <div class="case-row-title">${escapeHtml(kase.medicationName)} &middot; ${escapeHtml(kase.patientName)}</div>
+        <div class="case-row-sub">${escapeHtml(kase.triggerSummary)}</div>
+      </div>
+      <span class="pill ${tone}">${label}</span>
+    </div>
+    ${detail ? `<div class="fulfillment-detail muted small">${detail}</div>` : ""}
+    ${kase.status === "approval_required" ? renderApprovalPanel(kase) : ""}
+  `;
+}
+
+function renderFulfillmentList() {
+  const container = el("fulfillment-list");
+  if (!container) return; // Patient Panel markup not yet in the DOM on first paint
+  const supplyCases = state.cases.filter((c) => c.triggerType === "supply_risk");
+  if (!supplyCases.length) {
+    container.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortages match this panel's medications.</div>`;
+    return;
+  }
+  container.innerHTML = supplyCases.map((c) => `<div class="fulfillment-card">${renderFulfillmentRow(c)}</div>`).join("");
+}
+
+let patientPanelPollTimer = null;
+
+function refreshPatientPanel() {
+  loadCases().then(renderFulfillmentList);
+  loadEventFeed("fulfillment-event-feed");
+}
+
+function startPatientPanelPolling() {
+  refreshPatientPanel();
+  patientPanelPollTimer = setInterval(refreshPatientPanel, 4000);
+}
+
+function stopPatientPanelPolling() {
+  clearInterval(patientPanelPollTimer);
+  patientPanelPollTimer = null;
 }
 
 // ---- Drug Panel: real FDA shortage/recall status per medication, and who it touches ----
@@ -721,10 +798,12 @@ function toggleDrug(name) {
   renderDrugList();
 }
 
-async function loadEventFeed() {
+async function loadEventFeed(containerId = "event-feed") {
+  const container = el(containerId);
+  if (!container) return;
   try {
     const events = await fetchJSON("/api/events?limit=30");
-    el("event-feed").innerHTML = events.length
+    container.innerHTML = events.length
       ? events
           .map(
             (e) => `
@@ -737,7 +816,7 @@ async function loadEventFeed() {
           .join("")
       : `<p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Open the agent and ask something.</p>`;
   } catch (err) {
-    el("event-feed").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+    container.innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -781,6 +860,9 @@ function switchView(viewName) {
 
   if (viewName === "drug-panel") startDrugPanelPolling();
   else stopDrugPanelPolling();
+
+  if (viewName === "patient-panel") startPatientPanelPolling();
+  else stopPatientPanelPolling();
 }
 
 document.querySelectorAll(".view-tab").forEach((tab) => {
@@ -813,7 +895,6 @@ document.addEventListener("click", (e) => {
     return openCase(gotoCase.dataset.gotoCase);
   }
 
-  if (e.target.closest("[data-goto-mission-control]")) return switchView("mission-control");
 
   const approveBtn = e.target.closest("[data-approve]");
   if (approveBtn) return respondToApproval(approveBtn.dataset.approve, "allow");

@@ -21,6 +21,14 @@ import { describeToolServer, summarizeToolResult } from "./tool-telemetry.mjs";
 import { createToolCallAccumulator, resolveActualToolCall } from "./tool-call-accumulator.mjs";
 import { computeDrugPanel } from "./drug-panel.mjs";
 
+// Tools that require a pharmacist's explicit approval before they run, and
+// tools whose result should refresh the case-status line in the live event
+// feed - kept as simple name lists here rather than duplicated inline
+// checks, since both the chat flow and the autonomous fulfillment flow
+// share this same event-processing code.
+const APPROVAL_GATED_TOOLS = new Set(["create_pharmacist_review", "propose_alternative_supply"]);
+const CASE_MUTATING_TOOLS = new Set(["create_pharmacist_review", "place_refill_order", "propose_alternative_supply"]);
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
 const TRUEFORGE_URL = process.env.TRUEFORGE_URL || "http://localhost:8790";
@@ -100,10 +108,47 @@ app.get("/api/drugs", async (_req, res) => {
 
 // ---- Cases: real detections only, real lifecycle transitions only ----
 
+// Every supply-risk case is auto-triggered for fulfillment at most once
+// per server run - marked synchronously (before any await) the moment a
+// request handler decides to trigger one, so two near-simultaneous
+// pollers can never both fire it.
+const fulfillmentTriggered = new Set();
+
+/**
+ * Starts the agent on its own - no chat message, no person asking - to
+ * check real inventory and either reorder or propose a vetted alternative
+ * for a newly detected supply-risk case. Fire-and-forget: the caller must
+ * not await this, since a turn can take well over a minute and nothing
+ * should block the dashboard's polling on it.
+ */
+async function triggerAutonomousFulfillment(kase) {
+  try {
+    await caseStore.recordFulfillment(kase.id, { status: "investigating", startedAt: new Date().toISOString() });
+    missionControlLog.addEvent({
+      type: "session",
+      label: `Case ${kase.id} detected (${kase.medicationName} · ${kase.patientName}) - PharmaFlow investigating automatically`,
+    });
+    const { data: session } = await trueforge.sessions.create({ agent: { name: AGENT_NAME } });
+    const instruction =
+      `A new medication continuity case was just detected: ${kase.id} - ${kase.medicationName} ` +
+      `for ${kase.patientName} (${kase.triggerSummary}). Handle fulfillment for this case now.`;
+    await runBackgroundTurn(session.id, [{ type: "user.message", content: instruction }]);
+  } catch (err) {
+    console.error(`Autonomous fulfillment failed for case ${kase.id}:`, err);
+    missionControlLog.addEvent({ type: "turn_done", label: `Autonomous fulfillment failed for case ${kase.id}` });
+  }
+}
+
 app.get("/api/cases", async (_req, res) => {
   try {
     const cases = await reconcileCasesFromLiveData(caseStore);
     agentStatus.recordCheck("fda");
+    for (const kase of cases) {
+      if (kase.triggerType === "supply_risk" && kase.status === "detected" && !fulfillmentTriggered.has(kase.id)) {
+        fulfillmentTriggered.add(kase.id);
+        triggerAutonomousFulfillment(kase);
+      }
+    }
     res.json(cases);
   } catch (err) {
     res.status(502).json({ error: err.message });
@@ -140,15 +185,15 @@ app.get("/api/mission-control/stats", async (_req, res) => {
 // ---- Chat API: drives the TrueForge agent, streamed to the browser ----
 
 /**
- * Streams one turn (a new user message, or a resumed approval decision) to
- * the browser as SSE, logging real Mission Control events as it goes.
- * Shared by /api/chat and /api/chat/approval so both paths handle model
- * deltas, tool calls, tool results, approval-required pauses, and turn
- * completion exactly the same way.
+ * Processes one turn's real events - model deltas, tool calls, tool
+ * results, approval-required pauses, turn completion - updating the case
+ * store and Mission Control's live event feed as it goes. `send` is how
+ * each event reaches a live client; for a real person's chat that's an SSE
+ * write, for an autonomously-triggered fulfillment turn (no one
+ * necessarily watching) it's a no-op, since the case store and event log
+ * still update either way and are what the UI actually polls.
  */
-async function runTurn(res, sessionId, inputItems) {
-  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-
+async function processTurn(send, sessionId, inputItems) {
   try {
     const stream = await trueforge.sessions.createTurnStream(sessionId, { input: inputItems });
 
@@ -181,13 +226,14 @@ async function runTurn(res, sessionId, inputItems) {
           send("tool_result", { toolCallId: event.toolCallId, content: event.content });
           missionControlLog.addEvent({ type: "tool_result", label: summarizeToolResult(event.content) });
 
-          // If this was the pharmacist-review action, log the case's real
+          // If this was a case-mutating action, log the case's real
           // resulting state rather than assuming success - the MCP server
-          // is the one that actually resolved it. TrueForge may route the
-          // model's invocation directly or through its own call_tool
-          // meta-tool, so resolve the real tool name/args either way.
+          // is the one that actually resolved (or ordered, or proposed
+          // for) it. TrueForge may route the model's invocation directly
+          // or through its own call_tool meta-tool, so resolve the real
+          // tool name/args either way.
           const resolved = resolveActualToolCall(toolCalls.getById(event.toolCallId));
-          if (resolved?.name === "create_pharmacist_review") {
+          if (CASE_MUTATING_TOOLS.has(resolved?.name)) {
             try {
               const { caseId } = JSON.parse(resolved.args || "{}");
               const kase = caseId && (await caseStore.getCase(caseId));
@@ -204,16 +250,18 @@ async function runTurn(res, sessionId, inputItems) {
         case "tool.approval_required": {
           for (const tc of event.toolCalls ?? []) {
             const resolved = resolveActualToolCall(toolCalls.getById(tc.id));
-            if (resolved?.name !== "create_pharmacist_review") continue;
+            if (!APPROVAL_GATED_TOOLS.has(resolved?.name)) continue;
             try {
-              const { caseId, note } = JSON.parse(resolved.args || "{}");
+              const { caseId, note, alternativeDrugName } = JSON.parse(resolved.args || "{}");
               if (!caseId) continue;
               await caseStore.requestApprovalForCase(caseId, {
                 toolCallId: tc.id,
                 threadId: event.threadId,
                 sessionId,
+                note,
+                alternativeDrugName,
               });
-              send("approval_required", { caseId, note });
+              send("approval_required", { caseId, note, alternativeDrugName });
               missionControlLog.addEvent({ type: "approval_required", label: `Approval required for case ${caseId}` });
             } catch {
               // Malformed tool-call args shouldn't crash the stream relay.
@@ -238,11 +286,31 @@ async function runTurn(res, sessionId, inputItems) {
       }
     }
   } catch (err) {
-    console.error("Chat error:", err);
+    console.error("Turn processing error:", err);
     send("error", { message: err.message ?? String(err) });
+    missionControlLog.addEvent({ type: "turn_done", label: "Turn failed" });
+  }
+}
+
+/** Streams a real person's turn to the browser as SSE, on top of the shared processTurn core. */
+async function runTurn(res, sessionId, inputItems) {
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  try {
+    await processTurn(send, sessionId, inputItems);
   } finally {
     res.end();
   }
+}
+
+/**
+ * Runs a turn with no live client attached - used when PharmaFlow starts
+ * itself (a newly detected supply-risk case), not a person typing in
+ * chat. Nothing is streamed anywhere; the real case-store and event-log
+ * updates processTurn already makes are what the UI polls to show it
+ * happening "live".
+ */
+async function runBackgroundTurn(sessionId, inputItems) {
+  await processTurn(() => {}, sessionId, inputItems);
 }
 
 app.post("/api/chat", async (req, res) => {

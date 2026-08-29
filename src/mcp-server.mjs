@@ -14,9 +14,12 @@ import { z } from "zod";
 import * as store from "./store.mjs";
 import { createCaseStore } from "./cases.mjs";
 import { reconcileCasesFromLiveData } from "./case-reconciliation.mjs";
+import * as pharmacyInventory from "./pharmacy-inventory.mjs";
+import { createFulfillmentStore } from "./fulfillment.mjs";
 
 const PORT = process.env.MCP_PORT || 8791;
 const caseStore = createCaseStore();
+const fulfillmentStore = createFulfillmentStore();
 
 function buildServer() {
   const server = new McpServer({ name: "pharmaflow-tools", version: "0.1.0" });
@@ -119,6 +122,142 @@ function buildServer() {
     async () => ({
       content: [{ type: "text", text: JSON.stringify(await reconcileCasesFromLiveData(caseStore), null, 2) }],
     })
+  );
+
+  server.registerTool(
+    "check_pharmacy_inventory",
+    {
+      title: "Check pharmacy inventory",
+      description:
+        "Check the pharmacy's current stock level for a drug (synthetic data for this prototype - clearly labeled as such). Use this before deciding whether to reorder the same drug or propose an alternative. Pass caseId when checking on behalf of a specific case, so the real number checked is visible on that case, not just in this tool's result.",
+      inputSchema: {
+        drugName: z.string(),
+        caseId: z.string().optional().describe("The case this check is for, if any"),
+      },
+    },
+    async ({ drugName, caseId }) => {
+      const stock = await pharmacyInventory.getStock(drugName);
+      if (caseId) {
+        const kase = await caseStore.getCase(caseId);
+        if (kase) {
+          await caseStore.recordFulfillment(caseId, { lastCheckedStock: stock, lastCheckedAt: new Date().toISOString() });
+        }
+      }
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ drugName, stock, source: "synthetic_pharmacy_inventory" }, null, 2) },
+        ],
+      };
+    }
+  );
+
+  server.registerTool(
+    "place_refill_order",
+    {
+      title: "Place a refill order",
+      description:
+        "Order a fresh supply of a patient's current medication from the pharmacy's own inventory. This is a routine reorder of the same already-prescribed drug (not a clinical decision), so it does NOT require human approval. Fails if stock is 0 - call check_pharmacy_inventory first, and use propose_alternative_supply instead if none is available.",
+      inputSchema: { caseId: z.string().describe("The case id, e.g. 'PF-1001'") },
+    },
+    async ({ caseId }) => {
+      try {
+        const kase = await caseStore.getCase(caseId);
+        if (!kase) return { content: [{ type: "text", text: `No case found with id ${caseId}` }], isError: true };
+        if (kase.status !== "detected") {
+          return {
+            content: [{ type: "text", text: `Case ${caseId} is not awaiting fulfillment (status: ${kase.status}).` }],
+            isError: true,
+          };
+        }
+        const stock = await pharmacyInventory.getStock(kase.medicationName);
+        if (stock <= 0) {
+          return {
+            content: [
+              { type: "text", text: `${kase.medicationName} has 0 units in pharmacy inventory. Use propose_alternative_supply instead.` },
+            ],
+            isError: true,
+          };
+        }
+        const patient = await store.getPatient(kase.patientId);
+        const med = patient?.medications.find((m) => m.name === kase.medicationName);
+        const quantity = med?.daysSupply ? `${med.daysSupply}-day supply` : "1 refill";
+        const order = await fulfillmentStore.placeOrder({
+          caseId,
+          patientId: kase.patientId,
+          patientName: kase.patientName,
+          drugName: kase.medicationName,
+          quantity,
+        });
+        const resolved = await caseStore.resolveAsFulfilled(caseId, {
+          method: "auto_reorder",
+          drugName: kase.medicationName,
+          quantity,
+          orderId: order.id,
+          stockAtOrder: stock,
+          orderedAt: order.placedAt,
+        });
+        return { content: [{ type: "text", text: JSON.stringify(resolved, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: String(err.message ?? err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "propose_alternative_supply",
+    {
+      title: "Propose an alternative drug supply",
+      description:
+        "Propose switching a patient to an alternative drug because the original is out of stock. This is a consequential action and requires human (pharmacist) approval before it runs. alternativeDrugName MUST be one of the vetted candidates for this drug - never invent a substitute; an unlisted name is rejected.",
+      inputSchema: {
+        caseId: z.string().describe("The case id, e.g. 'PF-1001'"),
+        alternativeDrugName: z.string().describe("Must be a name from the reference list for this drug"),
+        note: z.string().describe("Short note for the pharmacist explaining the proposed switch"),
+      },
+    },
+    async ({ caseId, alternativeDrugName, note }) => {
+      try {
+        const kase = await caseStore.getCase(caseId);
+        if (!kase) return { content: [{ type: "text", text: `No case found with id ${caseId}` }], isError: true };
+        const isVetted = await pharmacyInventory.isApprovedAlternative(kase.medicationName, alternativeDrugName);
+        if (!isVetted) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `"${alternativeDrugName}" is not a vetted alternative for ${kase.medicationName}. Only a name from the reference list may be proposed.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const order = await fulfillmentStore.placeOrder({
+          caseId,
+          patientId: kase.patientId,
+          patientName: kase.patientName,
+          drugName: alternativeDrugName,
+          quantity: "1 refill",
+        });
+        const notification = await fulfillmentStore.notifyPatient({
+          caseId,
+          patientId: kase.patientId,
+          patientName: kase.patientName,
+          message: `Your prescription for ${kase.medicationName} has been switched to ${alternativeDrugName} due to a supply issue. Contact your pharmacy with any questions.`,
+        });
+        await caseStore.resolveCaseAfterAction(caseId, { approved: true, note });
+        const updated = await caseStore.recordFulfillment(caseId, {
+          method: "alternative_supply",
+          alternativeDrug: alternativeDrugName,
+          orderId: order.id,
+          notificationId: notification.id,
+          orderedAt: order.placedAt,
+          notifiedAt: notification.sentAt,
+        });
+        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: String(err.message ?? err) }], isError: true };
+      }
+    }
   );
 
   server.registerTool(

@@ -113,3 +113,37 @@ test("findCaseByPendingToolCallId finds the right case among several", () =>
     const found = await store.findCaseByPendingToolCallId("tc-target");
     assert.equal(found.id, cases[1].id);
   }));
+
+test("recordFulfillment merges partial updates without discarding earlier real fields", () =>
+  withTempCaseStore(async (store) => {
+    const [created] = await store.reconcileCases([supplyTrigger]);
+    await store.recordFulfillment(created.id, { status: "investigating" });
+    const updated = await store.recordFulfillment(created.id, { orderId: "ORD-abc123" });
+    assert.equal(updated.fulfillment.status, "investigating", "an earlier field must survive a later partial update");
+    assert.equal(updated.fulfillment.orderId, "ORD-abc123");
+  }));
+
+test("recordFulfillment rejects an unknown case id (failure case)", () =>
+  withTempCaseStore(async (store) => {
+    await assert.rejects(() => store.recordFulfillment("PF-9999", { status: "investigating" }), /Unknown case/);
+  }));
+
+test("resolveAsFulfilled resolves the case with fulfillment detail and no fabricated pharmacist decision", () =>
+  withTempCaseStore(async (store) => {
+    const [created] = await store.reconcileCases([supplyTrigger]);
+    const resolved = await store.resolveAsFulfilled(created.id, {
+      method: "auto_reorder",
+      orderId: "ORD-xyz789",
+      drugName: "Sumatriptan",
+    });
+    assert.equal(resolved.status, "resolved");
+    assert.equal(resolved.fulfillment.method, "auto_reorder");
+    assert.equal(resolved.pharmacistReview, null, "an automatic reorder must not claim a pharmacist reviewed it");
+  }));
+
+test("resolveAsFulfilled refuses to resolve a case that's already resolved (invalid input case)", () =>
+  withTempCaseStore(async (store) => {
+    const [created] = await store.reconcileCases([supplyTrigger]);
+    await store.resolveAsFulfilled(created.id, { method: "auto_reorder" });
+    await assert.rejects(() => store.resolveAsFulfilled(created.id, { method: "auto_reorder" }), /already resolved/);
+  }));

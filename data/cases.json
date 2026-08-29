@@ -1,1 +1,168 @@
-[]
+[
+  {
+    "id": "PF-1001",
+    "patientId": "p2",
+    "patientName": "Marcus Chen",
+    "medicationName": "Sodium Bicarbonate",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current",
+    "priority": "high",
+    "evidence": {
+      "source": "fda_live",
+      "status": "Current",
+      "updateDate": "08/25/2026",
+      "daysUntilDue": -2
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "approved",
+      "note": "Marcus Chen’s Sodium Bicarbonate 650 mg BID refill is overdue by 2 days; FDA live shortage status is Current, and checked pharmacy inventory is 0. Same-drug fulfillment cannot proceed from current stock; please review alternate supply/therapy options.",
+      "resolvedAt": "2026-08-29T22:14:24.910Z"
+    },
+    "fulfillment": {
+      "status": "investigating",
+      "startedAt": "2026-08-29T22:13:33.855Z",
+      "lastCheckedStock": 0,
+      "lastCheckedAt": "2026-08-29T22:13:44.299Z"
+    },
+    "createdAt": "2026-08-29T22:13:33.853Z",
+    "updatedAt": "2026-08-29T22:14:24.910Z"
+  },
+  {
+    "id": "PF-1002",
+    "patientId": "p3",
+    "patientName": "Priya Ramaswami",
+    "medicationName": "Sumatriptan",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: To Be Discontinued",
+    "priority": "high",
+    "evidence": {
+      "source": "fda_live",
+      "status": "To Be Discontinued",
+      "updateDate": "09/08/2025",
+      "daysUntilDue": -19
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "approved",
+      "note": "Priya Ramaswami’s Sumatriptan is overdue by 19 days, local synthetic pharmacy inventory shows 0 stock, and live FDA shortage data lists Sumatriptan nasal spray as To Be Discontinued. Patient also takes sertraline with a moderate SSRI-triptan interaction risk; pharmacist input is needed before alternate migraine therapy/supply is arranged.",
+      "resolvedAt": "2026-08-29T22:14:36.010Z"
+    },
+    "fulfillment": {
+      "lastCheckedStock": 0,
+      "lastCheckedAt": "2026-08-29T22:13:44.467Z"
+    },
+    "createdAt": "2026-08-29T22:13:33.854Z",
+    "updatedAt": "2026-08-29T22:14:36.010Z"
+  },
+  {
+    "id": "PF-1003",
+    "patientId": "p1",
+    "patientName": "Eleanor Whitfield",
+    "medicationName": "Warfarin + Ibuprofen",
+    "triggerType": "interaction_risk",
+    "triggerSummary": "Potential interaction: Warfarin + Ibuprofen",
+    "priority": "high",
+    "evidence": {
+      "source": "synthetic_interaction_table",
+      "note": "NSAIDs potentiate Warfarin's anticoagulant effect and independently irritate the GI lining, combined use significantly raises bleeding risk.",
+      "severity": "high"
+    },
+    "status": "detected",
+    "pendingApproval": null,
+    "pharmacistReview": null,
+    "fulfillment": null,
+    "createdAt": "2026-08-29T22:13:33.854Z",
+    "updatedAt": "2026-08-29T22:13:33.854Z"
+  },
+  {
+    "id": "PF-1004",
+    "patientId": "p1",
+    "patientName": "Eleanor Whitfield",
+    "medicationName": "Lisinopril",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current",
+    "priority": "high",
+    "evidence": {
+      "source": "demo",
+      "status": "Current",
+      "updateDate": "08/20/2026",
+      "daysUntilDue": 1
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "auto-resolved",
+      "note": "Underlying signal cleared before a review was created.",
+      "resolvedAt": "2026-08-29T22:17:28.504Z"
+    },
+    "fulfillment": {
+      "lastCheckedStock": 76,
+      "lastCheckedAt": "2026-08-29T22:17:40.267Z"
+    },
+    "createdAt": "2026-08-29T22:17:27.688Z",
+    "updatedAt": "2026-08-29T22:17:40.267Z"
+  },
+  {
+    "id": "PF-1005",
+    "patientId": "p2",
+    "patientName": "Marcus Chen",
+    "medicationName": "Lisinopril",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current",
+    "priority": "high",
+    "evidence": {
+      "source": "demo",
+      "status": "Current",
+      "updateDate": "08/20/2026",
+      "daysUntilDue": 0
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "auto-resolved",
+      "note": "Underlying signal cleared before a review was created.",
+      "resolvedAt": "2026-08-29T22:17:28.504Z"
+    },
+    "fulfillment": {
+      "status": "investigating",
+      "startedAt": "2026-08-29T22:17:27.691Z",
+      "lastCheckedStock": 76,
+      "lastCheckedAt": "2026-08-29T22:17:36.244Z"
+    },
+    "createdAt": "2026-08-29T22:17:27.688Z",
+    "updatedAt": "2026-08-29T22:17:36.244Z"
+  },
+  {
+    "id": "PF-1006",
+    "patientId": "p1",
+    "patientName": "Eleanor Whitfield",
+    "medicationName": "Warfarin",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current",
+    "priority": "high",
+    "evidence": {
+      "source": "demo",
+      "status": "Current",
+      "updateDate": "08/15/2026",
+      "daysUntilDue": 3
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "auto-resolved",
+      "note": "Underlying signal cleared before a review was created.",
+      "resolvedAt": "2026-08-29T22:20:44.032Z"
+    },
+    "fulfillment": {
+      "status": "investigating",
+      "startedAt": "2026-08-29T22:20:43.474Z",
+      "lastCheckedStock": 42,
+      "lastCheckedAt": "2026-08-29T22:20:52.122Z"
+    },
+    "createdAt": "2026-08-29T22:20:43.472Z",
+    "updatedAt": "2026-08-29T22:20:52.122Z"
+  }
+]

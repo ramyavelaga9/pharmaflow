@@ -52,6 +52,7 @@ function caseFromTrigger(trigger, id) {
     status: "detected",
     pendingApproval: null,
     pharmacistReview: null,
+    fulfillment: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -131,12 +132,15 @@ function createCaseStore(casesPath = DEFAULT_CASES_PATH) {
   // toolCallId/threadId) so an approval can be resumed purely from the
   // durable case record - it survives a page reload, and even a backend
   // restart, without depending on any in-memory conversation state.
-  async function requestApprovalForCase(caseId, { toolCallId, threadId, sessionId }) {
+  // note/alternativeDrugName are optional: present for
+  // propose_alternative_supply so the UI can show what's actually being
+  // proposed while it's still pending, not only after it's decided.
+  async function requestApprovalForCase(caseId, { toolCallId, threadId, sessionId, note, alternativeDrugName }) {
     const cases = await loadCases();
     const found = cases.find((c) => c.id === caseId);
     if (!found) throw new Error(`Unknown case: ${caseId}`);
     found.status = "approval_required";
-    found.pendingApproval = { toolCallId, threadId, sessionId };
+    found.pendingApproval = { toolCallId, threadId, sessionId, note: note ?? null, alternativeDrugName: alternativeDrugName ?? null };
     found.updatedAt = new Date().toISOString();
     await saveCases(cases);
     return found;
@@ -161,6 +165,37 @@ function createCaseStore(casesPath = DEFAULT_CASES_PATH) {
     return found;
   }
 
+  /**
+   * Merges real fulfillment progress onto a case - called both for a
+   * transient, honest "investigating" marker the moment a real background
+   * agent turn starts, and for the final order/notification details once
+   * a fulfillment tool actually executes. Never overwrites the whole
+   * object, so an earlier real field (e.g. the investigating timestamp)
+   * survives a later partial update.
+   */
+  async function recordFulfillment(caseId, fulfillment) {
+    const cases = await loadCases();
+    const found = cases.find((c) => c.id === caseId);
+    if (!found) throw new Error(`Unknown case: ${caseId}`);
+    found.fulfillment = { ...found.fulfillment, ...fulfillment };
+    found.updatedAt = new Date().toISOString();
+    await saveCases(cases);
+    return found;
+  }
+
+  /** Resolves a case via automatic fulfillment (sufficient stock, no approval needed) - distinct from resolveCaseAfterAction, which is for the human-approval path and would misleadingly record a "pharmacist decision" that never happened. */
+  async function resolveAsFulfilled(caseId, fulfillment) {
+    const cases = await loadCases();
+    const found = cases.find((c) => c.id === caseId);
+    if (!found) throw new Error(`Unknown case: ${caseId}`);
+    if (found.status === "resolved") throw new Error(`Case already resolved: ${caseId}`);
+    found.status = "resolved";
+    found.fulfillment = { ...found.fulfillment, ...fulfillment };
+    found.updatedAt = new Date().toISOString();
+    await saveCases(cases);
+    return found;
+  }
+
   return {
     reconcileCases,
     listCases,
@@ -168,6 +203,8 @@ function createCaseStore(casesPath = DEFAULT_CASES_PATH) {
     findCaseByPendingToolCallId,
     requestApprovalForCase,
     resolveCaseAfterAction,
+    recordFulfillment,
+    resolveAsFulfilled,
   };
 }
 
