@@ -38,6 +38,16 @@ const MCP_SERVERS = [
   },
 ];
 
+// Per-server settings on the agent itself (distinct from MCP_SERVERS above,
+// which registers the servers as harness-wide resources). create_pharmacist_review
+// is named explicitly rather than relying on the "@write"/"@destructive"
+// default categories, so approval-gating doesn't depend on annotation
+// heuristics working out.
+const AGENT_MCP_SERVERS = [
+  { name: "pharmaflow-tools", require_approval_for_tools: ["create_pharmacist_review"] },
+  { name: "fda-shortages" },
+];
+
 const SKILLS = [
   {
     name: "medication-continuity",
@@ -60,7 +70,14 @@ Always ground answers in the pharmaflow-tools and fda-shortages MCP tools,
 and the medication-continuity and shortage-analysis skills — never invent
 patient data or FDA records. When reporting a shortage, always say whether
 it came from live FDA data or a demo fixture. If a question is ambiguous
-about which patient is meant, ask before guessing.`;
+about which patient is meant, ask before guessing.
+
+When a medication continuity case (a real detected supply-risk or
+interaction-risk issue, identified via its "PF-" case id) genuinely needs
+pharmacist attention, call create_pharmacist_review with that case id and a
+short, concrete note. This requires human approval and will pause until a
+person responds - never treat it as a routine next step, and never call it
+speculatively "just in case."`;
 
 async function call(method, path, body) {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -131,7 +148,7 @@ async function upsertAgent(skillsRegistered) {
   const manifest = {
     model: { name: MODEL_NAME },
     instructions: AGENT_INSTRUCTIONS,
-    mcp_servers: MCP_SERVERS.map(({ name }) => ({ name })),
+    mcp_servers: AGENT_MCP_SERVERS,
     ...(skillsRegistered ? { skills: SKILLS.map(({ name }) => ({ name })) } : {}),
   };
   const { data: existing } = await call("GET", "/api/v1/agents");

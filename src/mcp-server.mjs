@@ -12,8 +12,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import * as store from "./store.mjs";
+import { createCaseStore } from "./cases.mjs";
+import { reconcileCasesFromLiveData } from "./case-reconciliation.mjs";
 
 const PORT = process.env.MCP_PORT || 8791;
+const caseStore = createCaseStore();
 
 function buildServer() {
   const server = new McpServer({ name: "pharmaflow-tools", version: "0.1.0" });
@@ -98,6 +101,44 @@ function buildServer() {
     async ({ patientId, medicationId, taken }) => {
       try {
         const updated = await store.logDose(patientId, medicationId, taken);
+        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: String(err.message ?? err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_cases",
+    {
+      title: "List medication continuity cases",
+      description:
+        "List real medication continuity cases (each tied to an actual detected supply-risk or high-severity interaction), reconciled against live data. Use this to find a case's id before calling create_pharmacist_review - never invent a case id.",
+      inputSchema: {},
+    },
+    async () => ({
+      content: [{ type: "text", text: JSON.stringify(await reconcileCasesFromLiveData(caseStore), null, 2) }],
+    })
+  );
+
+  server.registerTool(
+    "create_pharmacist_review",
+    {
+      title: "Create a pharmacist review",
+      description:
+        "Hand a medication continuity case off to a pharmacist for review. This is a consequential action and requires human approval before it runs - it does NOT diagnose, prescribe, or change a patient's medication. Only call this for a case that genuinely needs pharmacist attention, never as a default next step.",
+      inputSchema: {
+        caseId: z.string().describe("The case id, e.g. 'PF-1001'"),
+        note: z.string().describe("A short, concrete note for the pharmacist: what was found and why it matters"),
+      },
+    },
+    async ({ caseId, note }) => {
+      try {
+        const existing = await caseStore.getCase(caseId);
+        if (!existing) {
+          return { content: [{ type: "text", text: `No case found with id ${caseId}` }], isError: true };
+        }
+        const updated = await caseStore.resolveCaseAfterAction(caseId, { approved: true, note });
         return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: String(err.message ?? err) }], isError: true };

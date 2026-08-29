@@ -45,14 +45,26 @@
           <button class="view-tab active" data-view="patient-panel" role="tab" aria-selected="true">Patient Panel</button>
           <button class="view-tab" data-view="mission-control" role="tab" aria-selected="false">Mission Control</button>
         </nav>
-        <button id="chat-toggle" class="chat-toggle"><i class="ph ph-chats-circle"></i> Ask PharmaFlow</button>
+        <button id="chat-toggle" class="chat-toggle"><i class="ph ph-chats-circle"></i> Open Agent</button>
       </header>
 
       <div id="view-patient-panel" class="view">
         <div class="view-heading">
-          <h1 id="view-title">Panel overview</h1>
-          <p id="view-subtitle" class="muted">Refill, interaction, and supply risk across all patients</p>
+          <h1 id="view-title">Medication Continuity Command Center</h1>
+          <p id="view-subtitle" class="muted">PharmaFlow is monitoring medication supply, refill, and safety signals across the patient panel.</p>
         </div>
+
+        <section id="agent-status-strip" class="status-strip">
+          <div class="status-strip-head">
+            <span class="dot dot-ok" aria-hidden="true"></span>
+            <strong>PharmaFlow is monitoring</strong>
+          </div>
+          <div class="status-strip-rows">
+            <div class="status-row"><span>FDA signals</span><span id="status-fda">Not yet checked</span></div>
+            <div class="status-row"><span>Prescriptions</span><span id="status-prescriptions">Not yet checked</span></div>
+          </div>
+          <div id="status-attention" class="status-attention muted small">Checking for cases that need attention...</div>
+        </section>
 
         <section id="alerts-section" class="alerts-grid">
           <div class="alert-card">
@@ -78,7 +90,7 @@
           <div class="alert-card">
             <div class="alert-card-head">
               <span class="dot dot-warn" aria-hidden="true"></span>
-              <h2>Supply risk (FDA)</h2>
+              <h2>Medication supply risk</h2>
             </div>
             <div id="supply-risk-alerts" class="alert-list">
               <div class="skeleton-row"></div>
@@ -92,18 +104,21 @@
 
       <div id="view-mission-control" class="view hidden">
         <div class="view-heading">
-          <h1>Mission Control</h1>
-          <p class="muted">Real agent activity for this session, not a simulated preview.</p>
+          <div class="view-heading-row">
+            <h1>Mission Control</h1>
+            <span class="pill pill-ok"><span class="dot dot-ok"></span> Agent active</span>
+          </div>
+          <p class="muted">What PharmaFlow is doing about it, not just what it found.</p>
         </div>
 
         <section class="stat-grid">
           <div class="stat-tile">
-            <div class="stat-value" id="stat-active-cases">&ndash;</div>
-            <div class="stat-label">Active cases</div>
+            <div class="stat-value" id="stat-open-cases">&ndash;</div>
+            <div class="stat-label">Open cases</div>
           </div>
           <div class="stat-tile">
-            <div class="stat-value" id="stat-high-risk">&ndash;</div>
-            <div class="stat-label">High risk</div>
+            <div class="stat-value" id="stat-approval-required">&ndash;</div>
+            <div class="stat-label">Approval required</div>
           </div>
           <div class="stat-tile">
             <div class="stat-value" id="stat-tool-calls">&ndash;</div>
@@ -111,11 +126,20 @@
           </div>
         </section>
 
+        <section class="mission-card">
+          <h2><i class="ph ph-clipboard-text"></i> Medication continuity cases</h2>
+          <div id="case-list" class="case-list">
+            <div class="skeleton-row"></div>
+          </div>
+        </section>
+
+        <section id="case-detail" class="mission-card hidden"></section>
+
         <section class="mission-grid">
           <div class="mission-card">
             <h2><i class="ph ph-activity"></i> Live event feed</h2>
             <div id="event-feed" class="event-feed">
-              <p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Ask PharmaFlow something in the chat panel.</p>
+              <p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Open the agent and ask something.</p>
             </div>
           </div>
           <div class="mission-card">
@@ -138,7 +162,7 @@
     <aside id="chat-panel" class="chat-panel hidden">
       <div class="chat-header">
         <div>
-          <strong>Ask PharmaFlow</strong>
+          <strong>Open Agent</strong>
           <div class="muted small">Agent runtime: TrueForge &middot; Tools: pharmaflow-tools, fda-shortages MCP</div>
         </div>
         <button id="chat-close" class="icon-btn" aria-label="Close chat"><i class="ph ph-x"></i></button>
@@ -146,7 +170,8 @@
       <div id="chat-messages" class="chat-messages">
         <div class="chat-msg chat-msg-agent">
           Hi, I'm PharmaFlow. Ask me things like <em>"who's at risk of a refill gap this week?"</em> or
-          <em>"is anyone affected by a current FDA shortage?"</em>
+          <em>"is anyone affected by a current FDA shortage?"</em> I'll ask for approval in Mission Control before
+          taking any consequential action.
         </div>
       </div>
       <form id="chat-form" class="chat-form">

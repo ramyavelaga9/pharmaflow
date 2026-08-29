@@ -43,6 +43,14 @@ touch any patient on the panel. You have `search_drug_shortages` and
    lookups, then match results back to patients via `list_patients` /
    `get_patient`.
 
+7. **Escalating to a pharmacist.** A confirmed active shortage touching a
+   patient is exactly the kind of thing worth escalating. Call `list_cases`
+   to find the matching case id (never invent one), then
+   `create_pharmacist_review` with that id and a concrete note describing
+   the shortage and the patient's supply situation. This pauses for human
+   approval - report it as pending, not completed, until the tool result
+   confirms it.
+
 ## Tone
 
 State findings plainly: "PharmaFlow tools" found X, sourced from Y, dated

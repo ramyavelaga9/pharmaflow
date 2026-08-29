@@ -3,7 +3,9 @@
 PharmaFlow helps a care-coordination team catch medication continuity
 problems before they become crises: refill gaps, drug-drug interaction
 risk, adherence drop-off, and real FDA supply-shortage exposure across a
-patient panel. It's built on
+patient panel. When something genuinely needs a pharmacist's attention,
+PharmaFlow proposes a real action and **stops for human approval** before
+it happens. It's built on
 [TrueForge](https://github.com/truefoundry/trueforge), the open-source
 agent harness, for the [Agent Harness Hackathon](https://www.wemakedevs.org/blogs/agent-harness-hackathon-kick-off).
 
@@ -15,9 +17,10 @@ with a human in the loop) is the hard part. PharmaFlow's agent:
 
 - **Retrieves real data through tools, not its own memory.** Two domain-
   scoped MCP servers — `src/mcp-server.mjs` (patient records, refill
-  status, interaction checks, dose logging) and `src/fda-mcp-server.mjs`
-  (live openFDA drug-shortage lookups) — the agent has to call them, it
-  can't invent a patient's medication list or a shortage that doesn't exist.
+  status, interaction checks, dose logging, case lookup, pharmacist
+  review) and `src/fda-mcp-server.mjs` (live openFDA drug-shortage
+  lookups) — the agent has to call them, it can't invent a patient's
+  medication list, a case id, or a shortage that doesn't exist.
 - **Uses real external data, honestly labeled.** `src/fda.mjs` queries
   openFDA's live shortage API and falls back to a small, clearly labeled
   demo fixture only when the live API is genuinely unreachable — every
@@ -28,56 +31,98 @@ with a human in the loop) is the hard part. PharmaFlow's agent:
   (`skills/*/SKILL.md`) are git-backed instruction packs TrueForge loads
   at runtime — including an explicit instruction to never infer a
   medication substitution, matching the hackathon's safety requirements.
-- **Takes a real, persisted action** (`log_dose`) when asked, shared with
-  the dashboard through the same on-disk data store, so an action the
-  agent takes is immediately visible in the UI and vice versa.
+- **Stops for real human approval before a consequential action.**
+  `create_pharmacist_review` is configured on the agent's manifest as a
+  tool requiring explicit approval (`require_approval_for_tools`) - not a
+  decorative UI button. TrueForge genuinely pauses the turn; the browser
+  shows the real pending approval (persisted on the case itself, so it
+  survives a reload); approving or rejecting resumes that exact paused
+  turn via the TrueForge SDK. See "Case lifecycle" below.
+- **Maintains real, persisted cases**, not a mocked lifecycle. A case is
+  created only when a real supply-risk or high-severity interaction hit
+  exists, and only moves between `detected` / `approval_required` /
+  `resolved` on real events (`src/cases.mjs`, `src/case-triggers.mjs`).
 - **Runs on the harness, not around it.** Model provider, both MCP
   servers, both skills, and the agent are all registered on a locally
   running TrueForge instance via its REST API
   (`src/setup-trueforge.mjs`), and the web backend drives conversations
   through the TrueForge TypeScript SDK (`@truefoundry/trueforge-sdk`),
   streaming turns straight to the browser.
-- **Reports only real agent activity.** The dashboard's Mission Control
-  tab shows a live event feed and stat tiles sourced from actual chat
-  session/tool-call events (`src/event-log.mjs`) and the same panel-stats
-  computation the Patient Panel tab uses — never an invented score or a
-  simulated event that didn't happen.
+- **Reports only real agent activity.** Mission Control's live event feed,
+  stat tiles, and per-source "last checked" timestamps are all sourced
+  from actual chat/tool-call events (`src/event-log.mjs`,
+  `src/agent-status.mjs`) and the same data the Patient Panel tab uses —
+  never an invented score or a simulated event that didn't happen.
+
+## Case lifecycle
+
+```
+ real supply-risk / high-severity     agent calls create_pharmacist_review    a person
+   interaction detected                 (TrueForge pauses the turn)          approves/rejects
+        │                                        │                                │
+        ▼                                        ▼                                ▼
+    DETECTED  ─────────────────────────▶  APPROVAL_REQUIRED  ──────┬────────▶  RESOLVED (approved)
+        ▲                                                          │
+        └──────────────────────────────────────────────────────── ┴────────▶  DETECTED (rejected -
+             a case is reopened, never silently closed, on reject                reopened, not closed)
+```
+
+A case whose trigger clears on its own (e.g. the FDA record disappears)
+auto-resolves — but only from `detected`; a case already awaiting a human
+decision, or already resolved, is never overwritten by a live-data blip.
 
 ## Architecture
 
 ```
-┌─────────────┐   REST (dashboard data, supply risk, mission control)   ┌────────────────────┐
-│  Browser UI │ ───────────────────────────────────────────────────────▶│ PharmaFlow backend  │
-│ (web/*.html,│                                                          │  (src/backend.mjs)  │
-│  css, js)   │◀───────────────── SSE (agent chat turns) ────────────────│  Express + SDK      │
-└─────────────┘                                                          └──────────┬──────────┘
-                                                                                     │ TrueForge SDK
-                                                                                     ▼
-                                                                   ┌───────────────────────────┐
-                                                                   │   TrueForge (harness)     │
-                                                                   │ npx @truefoundry/trueforge│
-                                                                   │  agent: "pharmaflow"      │
-                                                                   └─────────┬────────┬────────┘
-                                                                             │        │
-                                                                  MCP (HTTP)│        │ git clone
-                                              ┌──────────────────────────────┴──┐  ┌──┴─────────────────────┐
-                                              │                                 │  │ medication-continuity /  │
-                                              ▼                                 ▼  │ shortage-analysis SKILL.md│
-                              ┌────────────────────────┐        ┌────────────────────────┐ └──────────────────┘
-                              │ PharmaFlow MCP           │        │ FDA MCP                 │
-                              │ (src/mcp-server.mjs)     │        │ (src/fda-mcp-server.mjs) │
-                              └───────────┬──────────────┘        └───────────┬──────────────┘
-                                          ▼                                   ▼
-                              ┌──────────────────────┐            ┌───────────────────────────┐
-                              │ data/patients.json    │            │ api.fda.gov/drug/shortages │
-                              │ data/interactions.json│            │ (falls back to a labeled   │
-                              └──────────────────────┘             │  demo fixture if unreachable)│
-                                                                    └───────────────────────────┘
+┌─────────────┐   REST (dashboard data, cases, agent status)   ┌────────────────────┐
+│  Browser UI │ ────────────────────────────────────────────────▶│ PharmaFlow backend  │
+│ (web/*.html,│                                                   │  (src/backend.mjs)  │
+│  css, js)   │◀────── SSE (chat turns + approval resume) ────────│  Express + SDK      │
+└─────────────┘                                                   └──────────┬──────────┘
+                                                                              │ TrueForge SDK
+                                                                              ▼
+                                                            ┌───────────────────────────┐
+                                                            │   TrueForge (harness)     │
+                                                            │ npx @truefoundry/trueforge│
+                                                            │  agent: "pharmaflow"      │
+                                                            └─────────┬────────┬────────┘
+                                                                      │        │
+                                                           MCP (HTTP)│        │ git clone
+                                       ┌──────────────────────────────┴──┐  ┌──┴─────────────────────┐
+                                       │                                 │  │ medication-continuity /  │
+                                       ▼                                 ▼  │ shortage-analysis SKILL.md│
+                       ┌────────────────────────┐        ┌────────────────────────┐ └──────────────────┘
+                       │ PharmaFlow MCP           │        │ FDA MCP                 │
+                       │ (src/mcp-server.mjs)     │        │ (src/fda-mcp-server.mjs) │
+                       └───────────┬──────────────┘        └───────────┬──────────────┘
+                                   ▼                                   ▼
+                       ┌──────────────────────────┐         ┌───────────────────────────┐
+                       │ data/patients.json,       │         │ api.fda.gov/drug/shortages │
+                       │ interactions.json, cases.json│      │ (labeled demo fallback)    │
+                       └──────────────────────────┘          └───────────────────────────┘
 ```
 
-Both the dashboard's REST API and the PharmaFlow MCP tool server read and
-write the same JSON files (`src/store.mjs`), so it's a genuinely shared
-source of truth rather than two demos glued together.
+Both the dashboard's REST API and the pharmacy MCP server read and write
+the same JSON files (`src/store.mjs`, `src/cases.mjs`) — a genuinely
+shared source of truth, and the reason `create_pharmacist_review`
+resolving a case from the *MCP server's own process* is immediately
+visible on the dashboard.
+
+### Two real TrueForge behaviors worth knowing before you extend this
+
+Found by testing against the live harness with a real model, not assumed
+from docs:
+
+- **TrueForge can route a tool call through its own `call_tool` meta-tool**
+  (`{mcp_server, tool_name, input}`) rather than the model calling a tool
+  by name directly — the same progressive-disclosure pattern this coding
+  session's own tools use. Anything that needs to recognize a specific
+  tool call (like approval-gating logic) has to check both shapes -
+  `src/tool-call-accumulator.mjs`'s `resolveActualToolCall` does this.
+- **The turn-input wire format for resuming a paused turn uses camelCase**
+  (`threadId`, `toolCallId`), not the snake_case shown in the cached
+  OpenAPI schema we initially checked against. Validated by the server's
+  own validation error, not by re-reading docs.
 
 ## Running it locally
 
@@ -101,10 +146,11 @@ npm run backend
 ```
 
 Open **http://localhost:8787** for the PharmaFlow dashboard — a
-**Patient Panel** tab (refill/interaction/supply-risk alerts, an "Ask
-PharmaFlow" chat drawer) and a **Mission Control** tab (real session
-stats, a live event feed, and the agent's current execution path) — or
-the TrueForge chat UI directly at **http://localhost:8790**.
+**Patient Panel** tab (a live agent-status strip, refill/interaction/
+supply-risk alerts, an "Open Agent" chat drawer) and a **Mission Control**
+tab (real case list with case detail + approve/reject, a live event feed,
+and the agent's current execution path) — or the TrueForge chat UI
+directly at **http://localhost:8790**.
 
 `npm run setup` is safe to re-run any time (e.g. after adding a real API
 key, or once the skills' GitHub URL is set via
@@ -118,41 +164,55 @@ npm test
 ```
 
 Runs on Node's built-in test runner (`node --test`, no extra dependency).
-Covers the data-correctness edge cases that matter most here: openFDA's
-404-as-"no matches" convention, live-API-unreachable → labeled demo
-fallback, drug-name normalization (including a false-positive-avoidance
-case), `MM/DD/YYYY` date parsing for the supply-risk dedup logic, refill
-status bucketing at day boundaries, and a rejection path for an unknown
-patient/medication.
+52 tests covering: openFDA's 404-as-"no matches" convention, live-API-
+unreachable → labeled demo fallback, drug-name normalization (including a
+false-positive-avoidance case), `MM/DD/YYYY` date parsing, refill-status
+day boundaries, case reconciliation (creation, dedup, auto-resolve, and
+the rule that a pending-approval or already-resolved case is never
+silently overwritten), and the tool-call accumulator that fixes a real
+bug found via live testing: a later round of tool calls reusing a stream
+index used to silently concatenate onto an earlier, finished call's name
+and arguments.
 
 ## Project layout
 
 ```
-data/                          mock patient panel, drug-interaction table, demo FDA fixture
-skills/medication-continuity/  agent procedure: refills, interactions, adherence
+data/                          mock patient panel, interaction table, demo FDA fixture, cases
+skills/medication-continuity/  agent procedure: refills, interactions, adherence, escalation
 skills/shortage-analysis/      agent procedure: FDA shortages, never infer a substitution
 src/store.mjs                  shared data layer (refill math, interactions, adherence, panel stats)
 src/fda.mjs                    openFDA shortage lookups, with the live/demo fallback
+src/cases.mjs                  case store: reconciliation, approval request/resolution
+src/case-triggers.mjs          pure: real alerts -> case triggers (supply-risk, high interactions)
+src/case-reconciliation.mjs    shared by backend + MCP server: live alerts -> reconciled cases
+src/tool-call-accumulator.mjs  streamed tool-call accumulation + call_tool unwrapping
+src/tool-telemetry.mjs         which MCP server a tool belongs to; honest result summaries
 src/event-log.mjs              capped in-memory ring buffer for Mission Control's live feed
-src/mcp-server.mjs             MCP tool server: patient data
+src/agent-status.mjs           real "last checked per source" tracking, no hardcoded timestamps
+src/mcp-server.mjs             MCP tool server: patient data, cases, pharmacist review
 src/fda-mcp-server.mjs         MCP tool server: FDA shortage data
-src/backend.mjs                dashboard REST API + /api/chat SSE bridge to TrueForge
+src/backend.mjs                dashboard REST API + /api/chat, /api/chat/approval SSE bridges
 src/setup-trueforge.mjs        registers providers/MCP servers/skills/agent via REST
 web/                           plain HTML/CSS/JS dashboard (no build step)
-test/                          node:test suites for fda.mjs, event-log.mjs, store.mjs
+test/                          node:test suites, one per src module above
 ```
 
 ## Scope trims (deliberate, not oversights)
 
 - `get_drug_shortage(id)` (drill-down by FDA record id) was dropped from
-  the FDA MCP server — nothing in the app needs it yet, and adding it
-  now would just be an untested, unused code path.
+  the FDA MCP server — nothing in the app needs it yet.
 - The orchestrator + specialized-subagent split (Supply / Patient-Impact /
-  Inventory / Safety), sandbox-based multi-day stockout simulation,
-  persistent SQLite case model, and gamification metrics described in the
-  full design brief are later milestones, not this slice — Mission
-  Control's stat tiles and execution graph intentionally show only what's
-  real today rather than a preview of agents that don't exist yet.
+  Inventory / Safety), a real orchestration graph, pharmacy inventory data,
+  sandbox-based multi-day stockout simulation, gamification metrics, and
+  mission replay from the full design brief are later milestones. Mission
+  Control's execution graph intentionally shows only the single agent +
+  two MCP servers that actually run today, not a preview of agents that
+  don't exist yet — the same reason the case lifecycle here is 3 real
+  stages, not the full 8-stage one in the brief.
+- The approve/reject action lives in Mission Control's case detail (not
+  duplicated in the chat drawer) since `/api/chat/approval` resolves
+  entirely from the case's own durable record — one real place to act,
+  not two UIs racing to resolve the same pending decision.
 
 ## Qodo Code Review Evidence
 
