@@ -833,6 +833,42 @@ button:active {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ---- Drug Panel: accordion - detail expands inline under its own row ---- */
+.drug-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.drug-item:has(.drug-expansion) .case-row {
+  border-radius: var(--radius-input) var(--radius-input) 0 0;
+}
+.drug-row-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.drug-caret {
+  color: var(--text-tertiary);
+  font-size: 15px;
+}
+.drug-expansion {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-input) var(--radius-input);
+  padding: 14px 16px 16px;
+}
+.drug-expansion h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 14px 0 8px;
+}
+.drug-expansion h3:first-child { margin-top: 0; }
 .case-row {
   display: flex;
   align-items: center;

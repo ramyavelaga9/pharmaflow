@@ -628,32 +628,8 @@ async function loadDrugPanel() {
   }
 }
 
-function renderDrugList() {
-  const container = el("drug-list");
-  if (!state.drugs.length) {
-    container.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No medications on the panel yet.</div>`;
-    return;
-  }
-  container.innerHTML = state.drugs
-    .map((d) => {
-      const pills = [
-        d.shortage ? `<span class="pill pill-danger">Shortage</span>` : "",
-        d.recall ? `<span class="pill pill-warn">${escapeHtml(d.recall.classification)} recall</span>` : "",
-        !d.shortage && !d.recall ? `<span class="pill pill-ok">No active issue</span>` : "",
-      ].join("");
-      return `
-      <button class="case-row ${d.name === activeDrugName ? "active" : ""}" data-open-drug="${escapeHtml(d.name)}">
-        <span class="case-row-main">
-          <div class="case-row-title">${escapeHtml(d.name)}</div>
-          <div class="case-row-sub">${d.patients.length} patient${d.patients.length === 1 ? "" : "s"} affected</div>
-        </span>
-        <span class="alert-row-pills">${pills}</span>
-      </button>`;
-    })
-    .join("");
-}
-
-function renderDrugDetail(drug) {
+/** Inline detail for one drug - rendered directly under its own row, not appended after the whole list. */
+function renderDrugExpansion(drug) {
   const patientsList = drug.patients
     .map((p) => `<span class="condition-tag">${escapeHtml(p.name)}</span>`)
     .join("");
@@ -679,29 +655,49 @@ function renderDrugDetail(drug) {
     : "";
 
   return `
-    <div class="patient-detail-head">
-      <div><h2>${escapeHtml(drug.name)}</h2></div>
-      <button class="icon-btn" id="close-drug-detail" aria-label="Close drug detail"><i class="ph ph-x"></i></button>
-    </div>
-    <div class="condition-tags">${patientsList || `<span class="muted small">No patient currently prescribed this.</span>`}</div>
-    ${shortageBlock}
-    ${recallBlock}
-    ${!drug.shortage && !drug.recall ? `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortage or recall for this medication.</div>` : ""}
-  `;
+    <div class="drug-expansion">
+      <div class="condition-tags">${patientsList || `<span class="muted small">No patient currently prescribed this.</span>`}</div>
+      ${shortageBlock}
+      ${recallBlock}
+      ${!drug.shortage && !drug.recall ? `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortage or recall for this medication.</div>` : ""}
+    </div>`;
 }
 
-function openDrug(name) {
-  const drug = state.drugs.find((d) => d.name === name);
-  activeDrugName = name;
-  renderDrugList();
-  const detail = el("drug-detail");
-  detail.classList.remove("hidden");
-  detail.innerHTML = drug ? renderDrugDetail(drug) : `<p class="error-note">Drug not found.</p>`;
+function renderDrugList() {
+  const container = el("drug-list");
+  if (!state.drugs.length) {
+    container.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No medications on the panel yet.</div>`;
+    return;
+  }
+  container.innerHTML = state.drugs
+    .map((d) => {
+      const expanded = d.name === activeDrugName;
+      const pills = [
+        d.shortage ? `<span class="pill pill-danger">Shortage</span>` : "",
+        d.recall ? `<span class="pill pill-warn">${escapeHtml(d.recall.classification)} recall</span>` : "",
+        !d.shortage && !d.recall ? `<span class="pill pill-ok">No active issue</span>` : "",
+      ].join("");
+      return `
+      <div class="drug-item">
+        <button class="case-row ${expanded ? "active" : ""}" data-open-drug="${escapeHtml(d.name)}" aria-expanded="${expanded}">
+          <span class="case-row-main">
+            <div class="case-row-title">${escapeHtml(d.name)}</div>
+            <div class="case-row-sub">${d.patients.length} patient${d.patients.length === 1 ? "" : "s"} affected</div>
+          </span>
+          <span class="drug-row-right">
+            <span class="alert-row-pills">${pills}</span>
+            <i class="ph ${expanded ? "ph-caret-up" : "ph-caret-down"} drug-caret"></i>
+          </span>
+        </button>
+        ${expanded ? renderDrugExpansion(d) : ""}
+      </div>`;
+    })
+    .join("");
 }
 
-function closeDrugDetail() {
-  activeDrugName = null;
-  el("drug-detail").classList.add("hidden");
+/** Clicking an open drug's row closes it; clicking a different one switches which is open (one at a time). */
+function toggleDrug(name) {
+  activeDrugName = activeDrugName === name ? null : name;
   renderDrugList();
 }
 
@@ -786,10 +782,9 @@ el("chat-form").addEventListener("submit", (e) => {
 document.addEventListener("click", (e) => {
   if (e.target.closest("#back-to-overview")) return backToOverview();
   if (e.target.closest("#close-case-detail")) return closeCaseDetail();
-  if (e.target.closest("#close-drug-detail")) return closeDrugDetail();
 
   const openDrugBtn = e.target.closest("[data-open-drug]");
-  if (openDrugBtn) return openDrug(openDrugBtn.dataset.openDrug);
+  if (openDrugBtn) return toggleDrug(openDrugBtn.dataset.openDrug);
 
   const gotoCase = e.target.closest("[data-goto-case]");
   if (gotoCase) {
