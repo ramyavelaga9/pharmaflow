@@ -5,7 +5,7 @@
     "patientName": "Marcus Chen",
     "medicationName": "Sodium Bicarbonate",
     "triggerType": "supply_risk",
-    "triggerSummary": "FDA shortage: Current",
+    "triggerSummary": "FDA shortage: Current (Pharmacy stock: 0 units)",
     "priority": "high",
     "evidence": {
       "source": "fda_live",
@@ -13,21 +13,24 @@
       "updateDate": "08/25/2026",
       "daysUntilDue": -2
     },
-    "status": "resolved",
-    "pendingApproval": null,
-    "pharmacistReview": {
-      "decision": "approved",
-      "note": "Marcus Chen’s Sodium Bicarbonate 650 mg BID refill is overdue by 2 days; FDA live shortage status is Current, and checked pharmacy inventory is 0. Same-drug fulfillment cannot proceed from current stock; please review alternate supply/therapy options.",
-      "resolvedAt": "2026-08-29T22:14:24.910Z"
+    "status": "approval_required",
+    "pendingApproval": {
+      "toolCallId": "call_sodium_bicarb_alt",
+      "toolName": "propose_alternative_supply",
+      "args": {
+        "caseId": "PF-1001",
+        "alternativeDrug": "Potassium Citrate",
+        "rationale": "Sodium Bicarbonate is out of stock (0 units). Potassium Citrate provides alkalinization therapy for CKD Stage 3."
+      }
     },
+    "pharmacistReview": null,
     "fulfillment": {
-      "status": "investigating",
-      "startedAt": "2026-08-29T22:13:33.855Z",
+      "status": "approval_required",
       "lastCheckedStock": 0,
-      "lastCheckedAt": "2026-08-29T22:13:44.299Z"
+      "proposedAlternative": "Potassium Citrate"
     },
     "createdAt": "2026-08-29T22:13:33.853Z",
-    "updatedAt": "2026-08-29T22:14:24.910Z"
+    "updatedAt": "2026-08-29T23:10:00.000Z"
   },
   {
     "id": "PF-1002",
@@ -35,7 +38,7 @@
     "patientName": "Priya Ramaswami",
     "medicationName": "Sumatriptan",
     "triggerType": "supply_risk",
-    "triggerSummary": "FDA shortage: To Be Discontinued",
+    "triggerSummary": "FDA shortage: To Be Discontinued (Pharmacy stock: 0 units)",
     "priority": "high",
     "evidence": {
       "source": "fda_live",
@@ -43,19 +46,24 @@
       "updateDate": "09/08/2025",
       "daysUntilDue": -19
     },
-    "status": "resolved",
-    "pendingApproval": null,
-    "pharmacistReview": {
-      "decision": "approved",
-      "note": "Priya Ramaswami’s Sumatriptan is overdue by 19 days, local synthetic pharmacy inventory shows 0 stock, and live FDA shortage data lists Sumatriptan nasal spray as To Be Discontinued. Patient also takes sertraline with a moderate SSRI-triptan interaction risk; pharmacist input is needed before alternate migraine therapy/supply is arranged.",
-      "resolvedAt": "2026-08-29T22:14:36.010Z"
+    "status": "approval_required",
+    "pendingApproval": {
+      "toolCallId": "call_sumatriptan_alt",
+      "toolName": "propose_alternative_supply",
+      "args": {
+        "caseId": "PF-1002",
+        "alternativeDrug": "Rizatriptan",
+        "rationale": "Sumatriptan is out of stock (0 units) and flagged to be discontinued. Rizatriptan is a vetted triptan class alternative for acute migraine."
+      }
     },
+    "pharmacistReview": null,
     "fulfillment": {
+      "status": "approval_required",
       "lastCheckedStock": 0,
-      "lastCheckedAt": "2026-08-29T22:13:44.467Z"
+      "proposedAlternative": "Rizatriptan"
     },
     "createdAt": "2026-08-29T22:13:33.854Z",
-    "updatedAt": "2026-08-29T22:14:36.010Z"
+    "updatedAt": "2026-08-29T23:10:00.000Z"
   },
   {
     "id": "PF-1003",
@@ -94,16 +102,20 @@
     "status": "resolved",
     "pendingApproval": null,
     "pharmacistReview": {
-      "decision": "auto-resolved",
-      "note": "Underlying signal cleared before a review was created.",
-      "resolvedAt": "2026-08-29T22:17:28.504Z"
+      "decision": "auto-reordered",
+      "note": "Sufficient stock available (76 units). Order ORD-LIS-101 placed automatically.",
+      "resolvedAt": "2026-08-29T23:10:00.000Z"
     },
     "fulfillment": {
-      "lastCheckedStock": 76,
-      "lastCheckedAt": "2026-08-29T22:17:40.267Z"
+      "status": "reordered",
+      "method": "auto_reorder",
+      "drugName": "Lisinopril 10mg",
+      "quantity": "30 units",
+      "stockAtOrder": 76,
+      "orderId": "ORD-LIS-101"
     },
     "createdAt": "2026-08-29T22:17:27.688Z",
-    "updatedAt": "2026-08-29T22:17:40.267Z"
+    "updatedAt": "2026-08-29T23:10:00.000Z"
   },
   {
     "id": "PF-1005",
@@ -122,18 +134,20 @@
     "status": "resolved",
     "pendingApproval": null,
     "pharmacistReview": {
-      "decision": "auto-resolved",
-      "note": "Underlying signal cleared before a review was created.",
-      "resolvedAt": "2026-08-29T22:17:28.504Z"
+      "decision": "auto-reordered",
+      "note": "Sufficient stock available (76 units). Order ORD-LIS-102 placed automatically.",
+      "resolvedAt": "2026-08-29T23:10:00.000Z"
     },
     "fulfillment": {
-      "status": "investigating",
-      "startedAt": "2026-08-29T22:17:27.691Z",
-      "lastCheckedStock": 76,
-      "lastCheckedAt": "2026-08-29T22:17:36.244Z"
+      "status": "reordered",
+      "method": "auto_reorder",
+      "drugName": "Lisinopril 20mg",
+      "quantity": "30 units",
+      "stockAtOrder": 76,
+      "orderId": "ORD-LIS-102"
     },
     "createdAt": "2026-08-29T22:17:27.688Z",
-    "updatedAt": "2026-08-29T22:17:36.244Z"
+    "updatedAt": "2026-08-29T23:10:00.000Z"
   },
   {
     "id": "PF-1006",
@@ -152,17 +166,19 @@
     "status": "resolved",
     "pendingApproval": null,
     "pharmacistReview": {
-      "decision": "auto-resolved",
-      "note": "Underlying signal cleared before a review was created.",
-      "resolvedAt": "2026-08-29T22:20:44.032Z"
+      "decision": "auto-reordered",
+      "note": "Sufficient stock available (42 units). Order ORD-WAR-103 placed automatically.",
+      "resolvedAt": "2026-08-29T23:10:00.000Z"
     },
     "fulfillment": {
-      "status": "investigating",
-      "startedAt": "2026-08-29T22:20:43.474Z",
-      "lastCheckedStock": 42,
-      "lastCheckedAt": "2026-08-29T22:20:52.122Z"
+      "status": "reordered",
+      "method": "auto_reorder",
+      "drugName": "Warfarin 5mg",
+      "quantity": "30 units",
+      "stockAtOrder": 42,
+      "orderId": "ORD-WAR-103"
     },
     "createdAt": "2026-08-29T22:20:43.472Z",
-    "updatedAt": "2026-08-29T22:20:52.122Z"
+    "updatedAt": "2026-08-29T23:10:00.000Z"
   }
 ]

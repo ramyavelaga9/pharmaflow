@@ -49,7 +49,10 @@ function buildServer() {
 const app = express();
 app.use(express.json());
 
-app.post("/mcp", async (req, res) => {
+app.all("/mcp", async (req, res) => {
+  if (req.headers.accept && req.headers.accept.includes("text/html")) {
+    return res.type("text/plain").send("PharmaFlow FDA MCP server active on /mcp (Streamable HTTP transport)");
+  }
   try {
     const server = buildServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

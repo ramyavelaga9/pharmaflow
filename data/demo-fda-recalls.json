@@ -11,5 +11,18 @@
     "recall_initiation_date": "20260601",
     "report_date": "20260615",
     "_demoNote": "Synthetic fixture for offline/demo mode - not a real FDA record."
+  },
+  {
+    "status": "Ongoing",
+    "classification": "Class I",
+    "openfda": { "generic_name": ["SERTRALINE HYDROCHLORIDE"], "brand_name": ["ZOLOFT"] },
+    "recalling_firm": "Apex Pharma Inc.",
+    "reason_for_recall": "Presence of particulate matter: glass particles detected in oral solution batches.",
+    "voluntary_mandated": "Voluntary: Firm initiated",
+    "distribution_pattern": "Nationwide USA",
+    "product_description": "Sertraline Hydrochloride Oral Solution, 20 mg/mL",
+    "recall_initiation_date": "20260710",
+    "report_date": "20260722",
+    "_demoNote": "Synthetic fixture for offline/demo mode - not a real FDA record."
   }
 ]

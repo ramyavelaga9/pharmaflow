@@ -1,14 +1,17 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PharmaFlow: Medication Continuity</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2314453d'/%3E%3Crect x='8' y='14' width='16' height='9' rx='4.5' transform='rotate(-45 16 16)' fill='%2352c9a6'/%3E%3Cline x1='16' y1='11.5' x2='16' y2='20.5' stroke='%2314453d' stroke-width='1.6' transform='rotate(-45 16 16)'/%3E%3C/svg%3E" />
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2314453d'/%3E%3Crect x='8' y='14' width='16' height='9' rx='4.5' transform='rotate(-45 16 16)' fill='%2352c9a6'/%3E%3Cline x1='16' y1='11.5' x2='16' y2='20.5' stroke='%2314453d' stroke-width='1.6' transform='rotate(-45 16 16)'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <div class="app">
     <aside class="sidebar">
@@ -16,7 +19,8 @@
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 32 32" width="22" height="22">
             <rect x="6" y="12.6" width="20" height="10.4" rx="5.2" transform="rotate(-45 16 16)" fill="currentColor" />
-            <line x1="16" y1="9.5" x2="16" y2="22.5" stroke="var(--surface)" stroke-width="1.8" transform="rotate(-45 16 16)" />
+            <line x1="16" y1="9.5" x2="16" y2="22.5" stroke="var(--surface)" stroke-width="1.8"
+              transform="rotate(-45 16 16)" />
           </svg>
         </span>
         <div>
@@ -53,9 +57,11 @@
         <div class="view-heading">
           <div class="view-heading-row">
             <h1>Medication Continuity Command Center</h1>
-            <span class="pill pill-ok live-badge"><span class="dot dot-ok pulse-dot"></span> Live &middot; Updated <span id="drug-panel-updated">--:--:--</span></span>
+            <span class="pill pill-ok live-badge"><span class="dot dot-ok pulse-dot"></span> Live &middot; Updated <span
+                id="drug-panel-updated">--:--:--</span></span>
           </div>
-          <p class="muted">PharmaFlow is monitoring medication supply, refill, and safety signals across the patient panel.</p>
+          <p class="muted">PharmaFlow is monitoring medication supply, refill, and safety signals across the patient
+            panel.</p>
         </div>
 
         <section id="agent-status-strip" class="status-strip">
@@ -65,11 +71,16 @@
             <span class="status-strip-scan muted small">Last scan: <span id="status-last-scan">not yet</span></span>
           </div>
           <div class="status-strip-rows">
-            <div class="status-row"><i id="status-fda-icon" class="ph ph-circle-dashed"></i><span>FDA signals</span><span id="status-fda">Not yet checked</span></div>
-            <div class="status-row"><i id="status-prescriptions-icon" class="ph ph-circle-dashed"></i><span>Prescriptions</span><span id="status-prescriptions">Not yet checked</span></div>
-            <div class="status-row status-row-untracked"><i class="ph ph-minus-circle"></i><span>Pharmacy inventory</span><span class="muted">Not tracked in this prototype</span></div>
+            <div class="status-row"><i id="status-fda-icon" class="ph ph-circle-dashed"></i><span>FDA
+                signals</span><span id="status-fda">Not yet checked</span></div>
+            <div class="status-row"><i id="status-prescriptions-icon"
+                class="ph ph-circle-dashed"></i><span>Prescriptions</span><span id="status-prescriptions">Not yet
+                checked</span></div>
+            <div class="status-row status-row-untracked"><i class="ph ph-minus-circle"></i><span>Pharmacy
+                inventory</span><span class="muted">Not tracked in this prototype</span></div>
           </div>
-          <div id="status-attention" class="status-attention muted small">Checking for cases that need attention...</div>
+          <div id="status-attention" class="status-attention muted small">Checking for cases that need attention...
+          </div>
         </section>
 
         <section class="stat-grid">
@@ -103,20 +114,36 @@
       <div id="view-patient-panel" class="view hidden">
         <div class="view-heading">
           <h1 id="view-title">Patient Panel</h1>
-          <p id="view-subtitle" class="muted">Browse patients and their current refill, interaction, and supply-risk status.</p>
+          <p id="view-subtitle" class="muted">Browse patients and their current refill, interaction, and supply-risk
+            status.</p>
         </div>
 
-        <section class="mission-card fulfillment-section">
-          <h2><i class="ph ph-package"></i> Supply fulfillment</h2>
-          <p class="muted small fulfillment-section-sub">
-            When an FDA shortage matches a patient's medication, PharmaFlow checks real pharmacy
-            inventory automatically. Enough stock reorders right away with no approval needed;
-            no stock triggers a vetted alternative that a pharmacist must approve before the
-            patient is notified and the order is placed.
-          </p>
-          <div id="fulfillment-list" class="fulfillment-list">
-            <div class="skeleton-row"></div>
+        <section class="alerts-grid operations-grid">
+          <div class="alert-card column-approval-card">
+            <div class="alert-card-head">
+              <span class="dot dot-critical" aria-hidden="true"></span>
+              <h2>Requires Pharmacist Approval & Action</h2>
+            </div>
+            <p class="muted small subtitle-note">Drug replacements (0 stock) &amp; FDA recall patient notifications</p>
+            <div id="human-approval-list" class="alert-list">
+              <div class="skeleton-row"></div>
+            </div>
           </div>
+
+          <div class="alert-card column-autonomous-card">
+            <div class="alert-card-head">
+              <span class="dot dot-ok" aria-hidden="true"></span>
+              <h2>Autonomous Agent Decisions</h2>
+            </div>
+            <p class="muted small subtitle-note">Automatic reorders (stock available) &amp; continuity actions taken</p>
+            <div id="autonomous-decisions-list" class="alert-list">
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="mission-card event-feed-card">
+          <h2><i class="ph ph-activity"></i> Operations Activity Feed</h2>
           <div id="fulfillment-event-feed" class="event-feed fulfillment-event-feed">
             <p class="empty-note"><i class="ph ph-moon-stars"></i> No fulfillment activity yet.</p>
           </div>
@@ -185,7 +212,8 @@
           <div class="mission-card">
             <h2><i class="ph ph-activity"></i> Live event feed</h2>
             <div id="event-feed" class="event-feed">
-              <p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Open the agent and ask something.</p>
+              <p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Open the agent and ask
+                something.</p>
             </div>
           </div>
           <div class="mission-card">
@@ -199,7 +227,8 @@
               <div class="graph-arrow" aria-hidden="true">&darr;</div>
               <div class="graph-node">fda-shortages MCP</div>
             </div>
-            <p class="muted small">This reflects what actually runs today. A specialized subagent split (supply, patient-impact, safety) extends this path in a later milestone, once it exists.</p>
+            <p class="muted small">This reflects what actually runs today. A specialized subagent split (supply,
+              patient-impact, safety) extends this path in a later milestone, once it exists.</p>
           </div>
         </section>
       </div>
@@ -221,7 +250,8 @@
         </div>
       </div>
       <form id="chat-form" class="chat-form">
-        <input id="chat-input" type="text" placeholder="Ask about refills, interactions, shortages" autocomplete="off" />
+        <input id="chat-input" type="text" placeholder="Ask about refills, interactions, shortages"
+          autocomplete="off" />
         <button type="submit" class="send-btn" aria-label="Send"><i class="ph-fill ph-arrow-up"></i></button>
       </form>
     </aside>
@@ -229,4 +259,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>

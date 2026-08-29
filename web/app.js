@@ -168,9 +168,9 @@ async function loadOverviewAlerts() {
     state.refillAlerts = await fetchJSON("/api/refill-alerts?days=14");
     el("refill-alerts").innerHTML = state.refillAlerts.length
       ? state.refillAlerts
-          .map((a) => {
-            const urgent = a.status === "overdue" || a.status === "critical";
-            return `
+        .map((a) => {
+          const urgent = a.status === "overdue" || a.status === "critical";
+          return `
         <div class="alert-row">
           <span class="alert-row-main">
             <div class="alert-row-title">${escapeHtml(a.medicationName)} &middot; ${escapeHtml(a.patientName)}</div>
@@ -181,8 +181,8 @@ async function loadOverviewAlerts() {
             ${urgent ? `<span class="pill pill-muted">Review recommended</span>` : ""}
           </span>
         </div>`;
-          })
-          .join("")
+        })
+        .join("")
       : `<div class="empty-note"><i class="ph ph-check-circle"></i> No refills due in the next two weeks.</div>`;
   } catch (err) {
     el("refill-alerts").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
@@ -192,12 +192,12 @@ async function loadOverviewAlerts() {
     state.interactionAlerts = await fetchJSON("/api/interaction-alerts");
     el("interaction-alerts").innerHTML = state.interactionAlerts.length
       ? state.interactionAlerts
-          .map((a) => {
-            // Only high-severity interactions become real cases (case-triggers.mjs) - a
-            // moderate one has nothing to open, so it stays a plain informational row.
-            const kase = a.severity === "high" ? findCaseForAlert(a.patientId, `${a.a} + ${a.b}`) : null;
-            const tag = alertRowTag(kase);
-            return `
+        .map((a) => {
+          // Only high-severity interactions become real cases (case-triggers.mjs) - a
+          // moderate one has nothing to open, so it stays a plain informational row.
+          const kase = a.severity === "high" ? findCaseForAlert(a.patientId, `${a.a} + ${a.b}`) : null;
+          const tag = alertRowTag(kase);
+          return `
         <${tag} ${alertRowAttrs(kase)}>
           <span class="alert-row-main">
             <div class="alert-row-title">${escapeHtml(a.a)} + ${escapeHtml(a.b)} &middot; ${escapeHtml(a.patientName)}</div>
@@ -205,8 +205,8 @@ async function loadOverviewAlerts() {
           </span>
           <span class="pill ${kase ? caseStatusPillClass(kase.status) : a.severity === "high" ? "pill-danger" : "pill-warn"}">${kase ? caseStatusLabel(kase.status) : a.severity}</span>
         </${tag}>`;
-          })
-          .join("")
+        })
+        .join("")
       : `<div class="empty-note"><i class="ph ph-check-circle"></i> No known interactions across the panel.</div>`;
   } catch (err) {
     el("interaction-alerts").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
@@ -291,11 +291,10 @@ function renderPatientDetail(patient) {
           <span>${escapeHtml(m.prescriber)}</span>
           <span>${m.refill.daysUntilDue < 0 ? `${Math.abs(m.refill.daysUntilDue)}d overdue` : `refill in ${m.refill.daysUntilDue}d`}</span>
         </div>
-        ${
-          showAdherence
-            ? `<div class="adherence-track"><div class="adherence-fill ${pct < 80 ? "low" : ""}" style="width:${pct}%"></div></div>
+        ${showAdherence
+          ? `<div class="adherence-track"><div class="adherence-fill ${pct < 80 ? "low" : ""}" style="width:${pct}%"></div></div>
                <div class="med-meta-row"><span>Adherence</span><span>${pct}% (${m.adherence.takenDays}/${m.adherence.loggedDays} days)</span></div>`
-            : `<div class="med-meta-row"><span>As-needed medication</span><span></span></div>`
+          : `<div class="med-meta-row"><span>As-needed medication</span><span></span></div>`
         }
         <div class="med-actions">
           <button class="log-taken" data-log="taken" data-med="${m.id}"><i class="ph ph-check"></i> Taken</button>
@@ -480,12 +479,12 @@ function renderCaseLifecycle(status) {
   return `
     <div class="case-lifecycle">
       ${stages
-        .map((s, i) => {
-          const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "pending";
-          const connector = i < stages.length - 1 ? `<span class="lifecycle-connector ${i < currentIndex ? "done" : ""}"></span>` : "";
-          return `<div class="lifecycle-step ${state}"><span class="lifecycle-dot"></span><span class="lifecycle-label">${s.label}</span></div>${connector}`;
-        })
-        .join("")}
+      .map((s, i) => {
+        const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "pending";
+        const connector = i < stages.length - 1 ? `<span class="lifecycle-connector ${i < currentIndex ? "done" : ""}"></span>` : "";
+        return `<div class="lifecycle-step ${state}"><span class="lifecycle-dot"></span><span class="lifecycle-label">${s.label}</span></div>${connector}`;
+      })
+      .join("")}
     </div>`;
 }
 
@@ -655,21 +654,78 @@ function renderFulfillmentRow(kase) {
   `;
 }
 
-function renderFulfillmentList() {
-  const container = el("fulfillment-list");
-  if (!container) return; // Patient Panel markup not yet in the DOM on first paint
-  const supplyCases = state.cases.filter((c) => c.triggerType === "supply_risk");
-  if (!supplyCases.length) {
-    container.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortages match this panel's medications.</div>`;
-    return;
+async function loadRecalls() {
+  try {
+    state.recalls = await fetchJSON("/api/recalls");
+  } catch {
+    state.recalls = [];
   }
-  container.innerHTML = supplyCases.map((c) => `<div class="fulfillment-card">${renderFulfillmentRow(c)}</div>`).join("");
+}
+
+async function acknowledgeRecall(recallId, patientId, patientName, medicationName) {
+  try {
+    await fetchJSON(`/api/recalls/${recallId}/acknowledge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patientId, patientName, medicationName, note: "Patient recall alert email sent" }),
+    });
+    await loadRecalls();
+    await loadCases();
+    renderFulfillmentList();
+    loadEventFeed("fulfillment-event-feed");
+  } catch (err) {
+    alert(`Couldn't acknowledge recall alert: ${err.message}`);
+  }
+}
+
+function renderFulfillmentList() {
+  const approvalContainer = el("human-approval-list");
+  const autonomousContainer = el("autonomous-decisions-list");
+  if (!approvalContainer || !autonomousContainer) return; // Markup not yet in DOM
+
+  const supplyCases = state.cases.filter((c) => c.triggerType === "supply_risk");
+
+  // --- Left Column: Human Approval & Actions ---
+  const recallCardsHtml = (state.recalls || []).map((r) => `
+    <div class="fulfillment-card">
+      <div class="fulfillment-row">
+        <div class="case-row-main">
+          <div class="case-row-title">${escapeHtml(r.medicationName)} &middot; ${escapeHtml(r.patientName)}</div>
+          <div class="case-row-sub">${escapeHtml(r.recallingFirm)} &middot; ${escapeHtml(r.classification)} Recall</div>
+        </div>
+        <span class="pill pill-danger">Recall active</span>
+      </div>
+      <div class="approval-panel">
+        <div class="approval-panel-head" style="color: var(--danger);">
+          <i class="ph-fill ph-prohibit"></i> Prescription Renewal Blocked
+        </div>
+        <p style="margin-bottom: 6px;"><strong>Reason:</strong> ${escapeHtml(r.reason)}</p>
+        <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 12px;"><strong>Distribution:</strong> ${escapeHtml(r.distributionPattern)}</p>
+        <div class="approval-actions">
+          <button class="approve-btn" data-acknowledge-recall="${escapeHtml(r.id)}" data-patient-id="${escapeHtml(r.patientId)}" data-patient-name="${escapeHtml(r.patientName)}" data-med-name="${escapeHtml(r.medicationName)}">
+            <i class="ph ph-check"></i> Send Recall Alert to Patient &amp; Acknowledge
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  const approvalCases = supplyCases.filter((c) => c.status === "approval_required" || (c.status === "detected" && c.fulfillment?.lastCheckedStock === 0));
+  const approvalCasesHtml = approvalCases.map((c) => `<div class="fulfillment-card">${renderFulfillmentRow(c)}</div>`).join("");
+
+  const leftColumnHtml = [recallCardsHtml, approvalCasesHtml].filter(Boolean).join("");
+  approvalContainer.innerHTML = leftColumnHtml || `<div class="empty-note"><i class="ph ph-check-circle"></i> No pending pharmacist approvals or recall alerts.</div>`;
+
+  // --- Right Column: Autonomous Agent Decisions ---
+  const autonomousCases = supplyCases.filter((c) => c.status === "resolved" || (c.status === "detected" && c.fulfillment?.lastCheckedStock > 0) || c.fulfillment?.status === "investigating");
+  const rightColumnHtml = autonomousCases.map((c) => `<div class="fulfillment-card">${renderFulfillmentRow(c)}</div>`).join("");
+  autonomousContainer.innerHTML = rightColumnHtml || `<div class="empty-note"><i class="ph ph-check-circle"></i> No autonomous decisions recorded yet.</div>`;
 }
 
 let patientPanelPollTimer = null;
 
 function refreshPatientPanel() {
-  loadCases().then(renderFulfillmentList);
+  Promise.all([loadCases(), loadRecalls()]).then(renderFulfillmentList);
   loadEventFeed("fulfillment-event-feed");
 }
 
@@ -805,15 +861,15 @@ async function loadEventFeed(containerId = "event-feed") {
     const events = await fetchJSON("/api/events?limit=30");
     container.innerHTML = events.length
       ? events
-          .map(
-            (e) => `
+        .map(
+          (e) => `
         <div class="event-row">
           <i class="ph ${eventIcon(e.type)}"></i>
           <span class="event-label">${escapeHtml(e.label)}</span>
           <span class="event-time">${new Date(e.timestamp).toLocaleTimeString()}</span>
         </div>`
-          )
-          .join("")
+        )
+        .join("")
       : `<p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Open the agent and ask something.</p>`;
   } catch (err) {
     container.innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
@@ -895,6 +951,16 @@ document.addEventListener("click", (e) => {
     return openCase(gotoCase.dataset.gotoCase);
   }
 
+
+  const recallBtn = e.target.closest("[data-acknowledge-recall]");
+  if (recallBtn) {
+    return acknowledgeRecall(
+      recallBtn.dataset.acknowledgeRecall,
+      recallBtn.dataset.patientId,
+      recallBtn.dataset.patientName,
+      recallBtn.dataset.medName
+    );
+  }
 
   const approveBtn = e.target.closest("[data-approve]");
   if (approveBtn) return respondToApproval(approveBtn.dataset.approve, "allow");

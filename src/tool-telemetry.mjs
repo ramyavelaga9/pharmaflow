@@ -9,12 +9,18 @@ const TOOL_SERVERS = {
   get_refill_alerts: "pharmaflow-tools",
   check_interactions: "pharmaflow-tools",
   log_dose: "pharmaflow-tools",
+  list_cases: "pharmaflow-tools",
   create_pharmacist_review: "pharmaflow-tools",
+  check_pharmacy_inventory: "pharmaflow-tools",
+  get_drug_alternatives: "pharmaflow-tools",
+  place_refill_order: "pharmaflow-tools",
+  propose_alternative_supply: "pharmaflow-tools",
   search_drug_shortages: "fda-shortages",
   get_recent_shortage_updates: "fda-shortages",
 };
 
 function describeToolServer(toolName) {
+  if (toolName === "call_tool") return "pharmaflow-tools";
   return TOOL_SERVERS[toolName] ?? "unknown";
 }
 

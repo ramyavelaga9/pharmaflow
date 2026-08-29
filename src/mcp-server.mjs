@@ -163,10 +163,9 @@ function buildServer() {
       try {
         const kase = await caseStore.getCase(caseId);
         if (!kase) return { content: [{ type: "text", text: `No case found with id ${caseId}` }], isError: true };
-        if (kase.status !== "detected") {
+        if (kase.status === "resolved" && kase.fulfillment?.method) {
           return {
-            content: [{ type: "text", text: `Case ${caseId} is not awaiting fulfillment (status: ${kase.status}).` }],
-            isError: true,
+            content: [{ type: "text", text: `Case ${caseId} has already been fulfilled (${kase.fulfillment.method}).` }],
           };
         }
         const stock = await pharmacyInventory.getStock(kase.medicationName);
@@ -295,7 +294,10 @@ app.use(express.json());
 // independently with no session/initialize handshake to track, which keeps
 // this simple for a prototype and matches TrueForge calling in as a plain
 // remote MCP server rather than holding a long-lived connection.
-app.post("/mcp", async (req, res) => {
+app.all("/mcp", async (req, res) => {
+  if (req.headers.accept && req.headers.accept.includes("text/html")) {
+    return res.type("text/plain").send("PharmaFlow MCP server active on /mcp (Streamable HTTP transport)");
+  }
   try {
     const server = buildServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

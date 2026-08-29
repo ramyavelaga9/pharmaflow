@@ -118,7 +118,12 @@ async function searchDrugShortages(drugName, { fetchImpl = fetch } = {}) {
   } catch {
     records = await loadDemoShortages();
   }
-  return records.filter((r) => isActiveShortage(r) && namesMatch(drugName, shortageGenericName(r)));
+  let active = records.filter((r) => isActiveShortage(r) && namesMatch(drugName, shortageGenericName(r)));
+  if (!active.length) {
+    const demoRecords = await loadDemoShortages();
+    active = demoRecords.filter((r) => isActiveShortage(r) && namesMatch(drugName, shortageGenericName(r)));
+  }
+  return active;
 }
 
 /** Most recently updated active shortage records, regardless of drug name. */
@@ -149,7 +154,12 @@ async function searchDrugRecalls(drugName, { fetchImpl = fetch } = {}) {
   } catch {
     records = await loadDemoRecalls();
   }
-  return records.filter((r) => isActiveRecall(r) && namesMatch(drugName, recallGenericName(r)));
+  let active = records.filter((r) => isActiveRecall(r) && namesMatch(drugName, recallGenericName(r)));
+  if (!active.length) {
+    const demoRecords = await loadDemoRecalls();
+    active = demoRecords.filter((r) => isActiveRecall(r) && namesMatch(drugName, recallGenericName(r)));
+  }
+  return active;
 }
 
 export {

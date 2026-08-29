@@ -20,6 +20,7 @@ import { computeSupplyRiskAlerts, reconcileCasesFromLiveData } from "./case-reco
 import { describeToolServer, summarizeToolResult } from "./tool-telemetry.mjs";
 import { createToolCallAccumulator, resolveActualToolCall } from "./tool-call-accumulator.mjs";
 import { computeDrugPanel } from "./drug-panel.mjs";
+import { createRecallStore } from "./recalls.mjs";
 
 // Tools that require a pharmacist's explicit approval before they run, and
 // tools whose result should refresh the case-status line in the live event
@@ -46,11 +47,40 @@ const conversationSessions = new Map();
 const missionControlLog = createEventLog();
 const agentStatus = createAgentStatus();
 const caseStore = createCaseStore();
+const recallStore = createRecallStore();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "web")));
+
+app.get("/api/recalls", async (_req, res) => {
+  try {
+    const alerts = await recallStore.getActiveRecallAlerts();
+    res.json(alerts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/recalls/:id/acknowledge", async (req, res) => {
+  try {
+    const { patientId, patientName, medicationName, note } = req.body ?? {};
+    const result = await recallStore.acknowledgeRecallAlert(req.params.id, {
+      patientId,
+      patientName,
+      medicationName,
+      note,
+    });
+    missionControlLog.addEvent({
+      type: "case_update",
+      label: `Recall Alert Sent & Acknowledged: ${medicationName} · ${patientName} (Dummy Email Sent)`,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 // ---- Dashboard REST API (no LLM involved — instant, always available) ----
 
