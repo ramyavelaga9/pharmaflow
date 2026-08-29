@@ -726,7 +726,6 @@ let patientPanelPollTimer = null;
 
 function refreshPatientPanel() {
   Promise.all([loadCases(), loadRecalls()]).then(renderFulfillmentList);
-  loadEventFeed("fulfillment-event-feed");
 }
 
 function startPatientPanelPolling() {
