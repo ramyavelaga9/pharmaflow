@@ -76,8 +76,8 @@
             <div class="status-row"><i id="status-prescriptions-icon"
                 class="ph ph-circle-dashed"></i><span>Prescriptions</span><span id="status-prescriptions">Not yet
                 checked</span></div>
-            <div class="status-row status-row-untracked"><i class="ph ph-minus-circle"></i><span>Pharmacy
-                inventory</span><span class="muted">Not tracked in this prototype</span></div>
+            <div class="status-row"><i class="ph ph-check-circle"></i><span>Pharmacy
+                inventory</span><span id="status-inventory">Not yet checked</span></div>
           </div>
           <div id="status-attention" class="status-attention muted small">Checking for cases that need attention...
           </div>
@@ -100,6 +100,131 @@
             <div class="stat-value" id="drug-stat-patients">&ndash;</div>
             <div class="stat-label">Patients affected</div>
           </div>
+        </section>
+
+        <section class="agent-village" aria-labelledby="agent-village-title">
+          <div class="village-toolbar">
+            <div>
+              <div class="eyebrow">LIVE ORCHESTRATION MAP</div>
+              <h2 id="agent-village-title">PharmaFlow Agent Village <span aria-hidden="true">✦</span></h2>
+              <p id="village-summary">Specialists are syncing with the orchestration agent.</p>
+            </div>
+            <div class="village-controls">
+              <button id="village-speed" class="pixel-control" type="button" aria-label="Change animation speed"><i class="ph ph-lightning"></i> 1×</button>
+              <button id="village-pause" class="pixel-control" type="button" aria-pressed="false"><i class="ph ph-pause"></i> Pause</button>
+              <div class="village-live"><span class="village-live-dot"></span> LIVE · <span id="village-sync">syncing</span></div>
+            </div>
+          </div>
+
+          <div class="quest-strip" aria-label="Operational workflow achievements">
+            <div class="quest-meter"><span class="quest-icon">🛡</span><div><small>CONTINUITY SHIELD</small><strong id="quest-resolved">—</strong></div><i><b id="quest-resolved-meter"></b></i></div>
+            <div class="quest-stat"><span class="quest-icon crystal">◆</span><div><small>LIVE EVIDENCE</small><strong id="quest-evidence">—</strong></div></div>
+            <div class="quest-stat"><span class="quest-icon">▣</span><div><small>STOCK RUNS</small><strong id="quest-stock">—</strong></div></div>
+            <div class="quest-stat"><span class="quest-icon">✉</span><div><small>SAFE DELIVERIES</small><strong id="quest-deliveries">—</strong></div></div>
+            <span class="quest-note">Workflow progress · not a clinical score</span>
+          </div>
+
+          <div class="pixel-world" role="img" aria-label="Animated pixel-art map of PharmaFlow agents collaborating">
+            <div class="pixel-sky" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="world-grid" aria-hidden="true"></div>
+            <div class="pixel-tree tree-one" aria-hidden="true"><i></i></div>
+            <div class="pixel-tree tree-two" aria-hidden="true"><i></i></div>
+            <div class="pixel-flower flower-one" aria-hidden="true"></div>
+            <div class="pixel-flower flower-two" aria-hidden="true"></div>
+
+            <div class="data-lane lane-left" aria-hidden="true"><span class="data-packet">Rx</span></div>
+            <div class="data-lane lane-right" aria-hidden="true"><span class="data-packet">FDA</span></div>
+            <div class="data-lane lane-bottom" aria-hidden="true"><span class="data-packet">✓</span></div>
+
+            <div class="agent-runner runner-rx" data-runner="rx" aria-hidden="true"><span class="runner-person mint-runner"><i></i></span><b>RX DATES</b></div>
+            <div class="agent-runner runner-fda" data-runner="fda" aria-hidden="true"><span class="runner-person blue-runner"><i></i></span><b>LIVE FDA</b></div>
+            <div class="agent-runner runner-safety" data-runner="safety" aria-hidden="true"><span class="runner-person coral-runner"><i></i></span><b>RISK</b></div>
+            <div class="agent-runner runner-inventory" data-runner="inventory" aria-hidden="true"><span class="runner-person purple-runner"><i></i></span><b>STOCK</b></div>
+            <div class="agent-runner runner-notify" data-runner="notify" aria-hidden="true"><span class="runner-person pink-runner"><i></i></span><b>NOTICE</b></div>
+
+            <article class="pixel-station station-rx" data-agent="rx" tabindex="0" role="button" aria-label="Inspect Rx Scout">
+              <div class="agent-speech" id="speech-rx">Checking refill windows…</div>
+              <div class="pixel-agent agent-mint" aria-hidden="true"><span class="agent-head"><i></i></span><span class="agent-body"></span><span class="agent-arm"></span><span class="agent-legs"></span></div>
+              <div class="station-console"><span></span><i></i></div>
+              <div class="agent-info">
+                <div class="agent-name"><span class="agent-dot mint"></span> Rx Scout <small id="state-rx">FETCHING</small></div>
+                <div class="agent-task" id="task-rx">Reading patient prescriptions</div>
+                <div class="confidence"><span>Confidence</span><strong id="confidence-rx">—</strong></div>
+                <div class="confidence-track"><i id="meter-rx"></i></div>
+              </div>
+            </article>
+
+            <article class="orchestrator-tower">
+              <div class="tower-pulse" aria-hidden="true"></div>
+              <div class="agent-speech speech-orchestrator" id="speech-orchestrator">Team, triangulate the evidence!</div>
+              <div class="pixel-agent agent-gold orchestrator-agent" aria-hidden="true"><span class="agent-head"><i></i></span><span class="agent-body"></span><span class="agent-arm"></span><span class="agent-legs"></span></div>
+              <div class="tower-building pixel-palace" aria-hidden="true">
+                <span class="palace-flag flag-left">✦</span><span class="palace-flag flag-right">✦</span>
+                <span class="palace-turret turret-left"></span><span class="palace-turret turret-right"></span>
+                <span class="tower-screen">PF</span><span class="palace-window window-left"></span><span class="palace-window window-right"></span>
+                <span class="palace-gate"><em></em></span><i></i><b></b>
+              </div>
+              <div class="orchestrator-info">
+                <span class="crown">♛</span>
+                <div><strong>Orchestration Agent</strong><small id="orchestrator-task">Coordinating specialists</small></div>
+                <span class="orchestrator-status"><i></i> ACTIVE</span>
+              </div>
+            </article>
+
+            <article class="pixel-station station-fda" data-agent="fda" tabindex="0" role="button" aria-label="Inspect FDA Ranger">
+              <div class="agent-speech" id="speech-fda">Pulling shortage details…</div>
+              <div class="pixel-agent agent-blue" aria-hidden="true"><span class="agent-head"><i></i></span><span class="agent-body"></span><span class="agent-arm"></span><span class="agent-legs"></span></div>
+              <div class="station-console"><span></span><i></i></div>
+              <div class="agent-info">
+                <div class="agent-name"><span class="agent-dot blue"></span> FDA Ranger <small id="state-fda">SCANNING</small></div>
+                <div class="agent-task" id="task-fda">Querying shortage intelligence</div>
+                <div class="confidence"><span>Confidence</span><strong id="confidence-fda">—</strong></div>
+                <div class="confidence-track"><i id="meter-fda"></i></div>
+              </div>
+            </article>
+
+            <article class="pixel-station station-inventory" data-agent="inventory" tabindex="0" role="button" aria-label="Inspect Inventory Keeper">
+              <div class="agent-speech" id="speech-inventory">Counting pharmacy stock…</div>
+              <div class="pixel-agent agent-purple roaming-agent" aria-hidden="true"><span class="agent-head"><i></i></span><span class="agent-body"></span><span class="agent-arm"></span><span class="agent-legs"></span></div>
+              <div class="station-console crate-console"><span></span><i></i></div>
+              <div class="agent-info">
+                <div class="agent-name"><span class="agent-dot purple"></span> Inventory Keeper <small id="state-inventory">COUNTING</small></div>
+                <div class="agent-task" id="task-inventory">Checking available units</div>
+                <div class="confidence"><span>Evidence</span><strong id="confidence-inventory">—</strong></div>
+                <div class="confidence-track"><i id="meter-inventory"></i></div>
+              </div>
+            </article>
+
+            <article class="pixel-station station-notify" data-agent="notify" tabindex="0" role="button" aria-label="Inspect Notification Courier">
+              <div class="agent-speech" id="speech-notify">Preparing a safe handoff…</div>
+              <div class="pixel-agent agent-pink roaming-agent" aria-hidden="true"><span class="agent-head"><i></i></span><span class="agent-body"></span><span class="agent-arm"></span><span class="agent-legs"></span></div>
+              <div class="station-console mail-console"><span></span><i></i></div>
+              <div class="agent-info">
+                <div class="agent-name"><span class="agent-dot pink"></span> Notification Courier <small id="state-notify">STANDBY</small></div>
+                <div class="agent-task" id="task-notify">Waiting for an approved action</div>
+                <div class="confidence"><span>Delivery readiness</span><strong id="confidence-notify">—</strong></div>
+                <div class="confidence-track"><i id="meter-notify"></i></div>
+              </div>
+            </article>
+
+            <article class="pixel-station station-safety" data-agent="safety" tabindex="0" role="button" aria-label="Inspect Safety Sage">
+              <div class="agent-speech" id="speech-safety">Cross-checking interactions…</div>
+              <div class="pixel-agent agent-coral" aria-hidden="true"><span class="agent-head"><i></i></span><span class="agent-body"></span><span class="agent-arm"></span><span class="agent-legs"></span></div>
+              <div class="station-console"><span></span><i></i></div>
+              <div class="agent-info">
+                <div class="agent-name"><span class="agent-dot coral"></span> Safety Sage <small id="state-safety">ANALYZING</small></div>
+                <div class="agent-task" id="task-safety">Comparing interaction evidence</div>
+                <div class="confidence"><span>Confidence</span><strong id="confidence-safety">—</strong></div>
+                <div class="confidence-track"><i id="meter-safety"></i></div>
+              </div>
+            </article>
+          </div>
+          <div id="agent-inspector" class="agent-inspector" aria-live="polite">
+            <span class="inspector-avatar">⌁</span>
+            <div><small>SELECT AN AGENT</small><strong>Click a villager to inspect their role and current evidence.</strong></div>
+            <span class="inspector-hint">hover to cheer · click to focus</span>
+          </div>
+          <div class="village-legend"><span><i class="legend-block active"></i> Working</span><span><i class="legend-block waiting"></i> Waiting</span><span><i class="legend-block message"></i> Data in transit</span><small>Confidence reflects agreement across the currently available case evidence.</small></div>
         </section>
 
         <section class="mission-card">
@@ -177,53 +302,7 @@
           <p class="muted">What PharmaFlow is doing about it, not just what it found.</p>
         </div>
 
-        <section class="stat-grid">
-          <div class="stat-tile">
-            <div class="stat-value" id="stat-open-cases">&ndash;</div>
-            <div class="stat-label">Open cases</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-value" id="stat-approval-required">&ndash;</div>
-            <div class="stat-label">Approval required</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-value" id="stat-tool-calls">&ndash;</div>
-            <div class="stat-label">Tool calls this session</div>
-          </div>
-        </section>
-
-        <section class="mission-card">
-          <h2><i class="ph ph-clipboard-text"></i> Medication continuity cases</h2>
-          <div id="case-list" class="case-list">
-            <div class="skeleton-row"></div>
-          </div>
-        </section>
-
         <section id="case-detail" class="mission-card hidden"></section>
-
-        <section class="mission-grid">
-          <div class="mission-card">
-            <h2><i class="ph ph-activity"></i> Live event feed</h2>
-            <div id="event-feed" class="event-feed">
-              <p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Open the agent and ask
-                something.</p>
-            </div>
-          </div>
-          <div class="mission-card">
-            <h2><i class="ph ph-flow-arrow"></i> Execution path</h2>
-            <div class="execution-graph">
-              <div class="graph-node">User</div>
-              <div class="graph-arrow" aria-hidden="true">&darr;</div>
-              <div class="graph-node graph-node-accent">PharmaFlow agent (TrueForge)</div>
-              <div class="graph-arrow" aria-hidden="true">&darr;</div>
-              <div class="graph-node">pharmaflow-tools MCP</div>
-              <div class="graph-arrow" aria-hidden="true">&darr;</div>
-              <div class="graph-node">fda-shortages MCP</div>
-            </div>
-            <p class="muted small">This reflects what actually runs today. A specialized subagent split (supply,
-              patient-impact, safety) extends this path in a later milestone, once it exists.</p>
-          </div>
-        </section>
       </div>
     </main>
 

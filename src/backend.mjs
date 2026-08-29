@@ -21,6 +21,7 @@ import { describeToolServer, summarizeToolResult } from "./tool-telemetry.mjs";
 import { createToolCallAccumulator, resolveActualToolCall } from "./tool-call-accumulator.mjs";
 import { computeDrugPanel } from "./drug-panel.mjs";
 import { createRecallStore } from "./recalls.mjs";
+import { createFulfillmentStore } from "./fulfillment.mjs";
 
 // Tools that require a pharmacist's explicit approval before they run, and
 // tools whose result should refresh the case-status line in the live event
@@ -48,6 +49,7 @@ const missionControlLog = createEventLog();
 const agentStatus = createAgentStatus();
 const caseStore = createCaseStore();
 const recallStore = createRecallStore();
+const fulfillmentStore = createFulfillmentStore();
 
 const app = express();
 app.use(cors());
@@ -206,10 +208,21 @@ app.get("/api/events", (req, res) => {
 
 app.get("/api/mission-control/stats", async (_req, res) => {
   const panelStats = await store.getPanelStats();
+  const cases = await caseStore.listCases();
+  const [orders, notifications] = await Promise.all([fulfillmentStore.listOrders(), fulfillmentStore.listNotifications()]);
   const toolCallsThisSession = missionControlLog
     .getRecentEvents(DEFAULT_MAX_EVENTS)
     .filter((e) => e.type === "tool_call").length;
-  res.json({ ...panelStats, toolCallsThisSession });
+  res.json({
+    ...panelStats,
+    toolCallsThisSession,
+    totalCases: cases.length,
+    resolvedCases: cases.filter((c) => c.status === "resolved").length,
+    liveEvidenceCases: cases.filter((c) => c.evidence?.source === "fda_live").length,
+    inventoryChecks: cases.filter((c) => c.fulfillment?.lastCheckedStock != null || c.fulfillment?.stockAtOrder != null).length,
+    ordersPlaced: orders.length,
+    notificationsSent: notifications.length,
+  });
 });
 
 // ---- Chat API: drives the TrueForge agent, streamed to the browser ----

@@ -17,6 +17,7 @@ const TOOL_SERVERS = {
   propose_alternative_supply: "pharmaflow-tools",
   search_drug_shortages: "fda-shortages",
   get_recent_shortage_updates: "fda-shortages",
+  search_drug_recalls: "fda-shortages",
 };
 
 function describeToolServer(toolName) {

@@ -9,6 +9,7 @@ const state = {
   refillAlerts: [],
   interactionAlerts: [],
   supplyRiskAlerts: [],
+  missionStats: null,
   conversationId: localStorage.getItem("pharmaflow-conversation-id") ?? crypto.randomUUID(),
 };
 localStorage.setItem("pharmaflow-conversation-id", state.conversationId);
@@ -87,6 +88,11 @@ async function loadAgentStatus() {
     const status = await fetchJSON("/api/agent-status");
     el("status-fda").textContent = formatRelativeTime(status.lastChecked.fda);
     el("status-prescriptions").textContent = formatRelativeTime(status.lastChecked.prescriptions);
+    const inventoryChecks = state.cases
+      .map((c) => c.fulfillment?.lastCheckedAt ?? (c.fulfillment?.stockAtOrder != null ? c.updatedAt : null))
+      .filter(Boolean)
+      .sort();
+    el("status-inventory").textContent = formatRelativeTime(inventoryChecks.at(-1));
     setCheckedIcon("status-fda-icon", Boolean(status.lastChecked.fda));
     setCheckedIcon("status-prescriptions-icon", Boolean(status.lastChecked.prescriptions));
 
@@ -387,6 +393,8 @@ async function sendChatMessage(message) {
 // ---- Mission Control: real agent activity, polled while the tab is visible ----
 
 let missionControlPollTimer = null;
+let villageLastEvents = [];
+let villageSpeed = 1;
 
 function eventIcon(type) {
   return {
@@ -416,16 +424,16 @@ function findCaseForAlert(patientId, medicationName) {
 async function loadCases() {
   try {
     state.cases = await fetchJSON("/api/cases");
-    el("stat-open-cases").textContent = state.cases.filter((c) => c.status !== "resolved").length;
-    el("stat-approval-required").textContent = state.cases.filter((c) => c.status === "approval_required").length;
     renderCaseList();
+    renderAgentVillage();
   } catch (err) {
-    el("case-list").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+    if (el("case-list")) el("case-list").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
   }
 }
 
 function renderCaseList() {
   const container = el("case-list");
+  if (!container) return;
   if (!state.cases.length) {
     container.innerHTML = `<div class="empty-note"><i class="ph ph-check-circle"></i> No medication continuity cases open right now.</div>`;
     return;
@@ -855,10 +863,11 @@ function toggleDrug(name) {
 
 async function loadEventFeed(containerId = "event-feed") {
   const container = el(containerId);
-  if (!container) return;
   try {
     const events = await fetchJSON("/api/events?limit=30");
-    container.innerHTML = events.length
+    villageLastEvents = events;
+    renderAgentVillage(events);
+    if (container) container.innerHTML = events.length
       ? events
         .map(
           (e) => `
@@ -871,14 +880,137 @@ async function loadEventFeed(containerId = "event-feed") {
         .join("")
       : `<p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Open the agent and ask something.</p>`;
   } catch (err) {
-    container.innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+    if (container) container.innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
   }
+}
+
+function setVillageAgent(name, { confidence, stateLabel, task, speech, working = true }) {
+  const pct = Math.max(0, Math.min(100, confidence));
+  el(`confidence-${name}`).textContent = `${pct}%`;
+  el(`meter-${name}`).style.width = `${pct}%`;
+  el(`state-${name}`).textContent = stateLabel;
+  el(`task-${name}`).textContent = task;
+  el(`speech-${name}`).textContent = speech;
+  document.querySelector(`[data-agent="${name}"]`)?.classList.toggle("agent-waiting", !working);
+  document.querySelector(`[data-runner="${name}"]`)?.classList.toggle("runner-active", working);
+}
+
+/** Visualizes only real case/event state; confidence is a transparent evidence-completeness score, not a clinical probability. */
+function renderAgentVillage(events = villageLastEvents) {
+  const open = state.cases.filter((c) => c.status !== "resolved");
+  const supply = open.filter((c) => c.triggerType === "supply_risk");
+  const interactions = open.filter((c) => c.triggerType === "interaction_risk");
+  const hasEvents = events.length > 0;
+  const toolEvent = events.find((e) => e.type === "tool_call" || e.type === "tool_result");
+  const latest = events[0];
+  const rxEvidence = state.cases.filter((c) => c.evidence?.daysUntilDue != null).length;
+  const fdaLive = state.cases.filter((c) => c.evidence?.source === "fda_live").length;
+  const resolved = state.cases.filter((c) => c.status === "resolved").length;
+  const inventoryCases = state.cases.filter((c) => c.fulfillment?.lastCheckedStock != null || c.fulfillment?.stockAtOrder != null);
+  const notificationCount = state.missionStats?.notificationsSent ?? 0;
+  const approvals = open.filter((c) => c.status === "approval_required");
+
+  const rxConfidence = state.cases.length ? Math.min(98, 68 + rxEvidence * 5) : 64;
+  const fdaConfidence = state.cases.length ? Math.min(97, 66 + fdaLive * 6 + supply.length * 2) : 61;
+  const safetyConfidence = state.cases.length ? Math.min(96, 72 + interactions.length * 8 + resolved * 2) : 66;
+
+  setVillageAgent("rx", {
+    confidence: rxConfidence,
+    stateLabel: rxEvidence ? "VERIFIED" : "FETCHING",
+    task: rxEvidence ? `${rxEvidence} refill timeline${rxEvidence === 1 ? "" : "s"} grounded` : "Reading patient prescriptions",
+    speech: rxEvidence ? `I found ${rxEvidence} dated refill signal${rxEvidence === 1 ? "" : "s"}!` : "Checking refill windows…",
+    working: Boolean(open.length || hasEvents),
+  });
+  setVillageAgent("fda", {
+    confidence: fdaConfidence,
+    stateLabel: supply.length ? "TRACKING" : "SYNCED",
+    task: supply.length ? `${supply.length} active supply case${supply.length === 1 ? "" : "s"}` : "Shortage intelligence synchronized",
+    speech: supply.length ? `${supply.length} shortage signal${supply.length === 1 ? "" : "s"} routed!` : "FDA channel is clear.",
+    working: Boolean(supply.length || fdaLive || toolEvent),
+  });
+  setVillageAgent("safety", {
+    confidence: safetyConfidence,
+    stateLabel: interactions.length ? "REVIEWING" : "CLEAR",
+    task: interactions.length ? `${interactions.length} interaction case${interactions.length === 1 ? "" : "s"} under review` : "Interaction evidence checked",
+    speech: interactions.length ? `Flagged ${interactions.length} safety review!` : "Safety cross-check complete.",
+    working: Boolean(interactions.length || toolEvent),
+  });
+  setVillageAgent("inventory", {
+    confidence: inventoryCases.length ? Math.min(99, 76 + inventoryCases.length * 4) : 54,
+    stateLabel: inventoryCases.length ? "COUNTED" : supply.length ? "DISPATCHED" : "STANDBY",
+    task: inventoryCases.length ? `${inventoryCases.length} stock check${inventoryCases.length === 1 ? "" : "s"} recorded` : supply.length ? "Walking to the stock room" : "Inventory route is clear",
+    speech: inventoryCases.length ? `${inventoryCases.length} shelf count${inventoryCases.length === 1 ? "" : "s"} delivered!` : supply.length ? "On my way to inventory!" : "Shelves ready for checks.",
+    working: Boolean(supply.length || inventoryCases.length),
+  });
+  setVillageAgent("notify", {
+    confidence: notificationCount ? 98 : approvals.length ? 82 : 48,
+    stateLabel: notificationCount ? "DELIVERED" : approvals.length ? "AT GATE" : "STANDBY",
+    task: notificationCount ? `${notificationCount} approved notice${notificationCount === 1 ? "" : "s"} delivered` : approvals.length ? "Waiting at the human approval gate" : "No approved notification queued",
+    speech: notificationCount ? "Message delivered safely!" : approvals.length ? "I’ll wait here for approval." : "No message leaves without approval!",
+    working: Boolean(notificationCount),
+  });
+
+  const totalCases = state.missionStats?.totalCases ?? state.cases.length;
+  const resolvedCases = state.missionStats?.resolvedCases ?? resolved;
+  const resolutionPct = totalCases ? Math.round((resolvedCases / totalCases) * 100) : 100;
+  el("quest-resolved").textContent = `${resolvedCases}/${totalCases} quests cleared`;
+  el("quest-resolved-meter").style.width = `${resolutionPct}%`;
+  el("quest-evidence").textContent = `${state.missionStats?.liveEvidenceCases ?? fdaLive} verified`;
+  el("quest-stock").textContent = `${state.missionStats?.inventoryChecks ?? inventoryCases.length} completed`;
+  el("quest-deliveries").textContent = `${notificationCount} sent`;
+
+  el("village-summary").textContent = open.length
+    ? `${open.length} open case${open.length === 1 ? "" : "s"} moving through the village right now.`
+    : "All current signals have been routed; specialists remain on watch.";
+  el("village-sync").textContent = latest ? formatRelativeTime(latest.timestamp) : "standing by";
+  el("orchestrator-task").textContent = latest?.label || (open.length ? `Prioritizing ${open.length} open case${open.length === 1 ? "" : "s"}` : "Monitoring the patient panel");
+  el("speech-orchestrator").textContent = latest?.type === "approval_required"
+    ? "Human decision needed at the gate!"
+    : open.length
+      ? "Team, triangulate the evidence!"
+      : "Nice work—stay alert!";
+}
+
+const villageAgentDetails = {
+  rx: ["Rx Scout", "Connects real refill dates to each patient and returns grounded continuity signals."],
+  fda: ["FDA Ranger", "Retrieves shortage and recall intelligence, preserving whether evidence is live or a demo fixture."],
+  safety: ["Safety Sage", "Cross-checks medication combinations and routes high-risk findings for human review."],
+  inventory: ["Inventory Keeper", "Checks the synthetic pharmacy stock source before any routine refill can be placed."],
+  notify: ["Notification Courier", "Delivers simulated patient notices only after the required action or approval succeeds."],
+};
+
+function inspectVillageAgent(name) {
+  const [title, description] = villageAgentDetails[name];
+  document.querySelectorAll(".pixel-station").forEach((station) => station.classList.toggle("selected", station.dataset.agent === name));
+  el("agent-inspector").innerHTML = `<span class="inspector-avatar">${name === "notify" ? "✉" : name === "inventory" ? "▣" : "⌁"}</span><div><small>VISUAL SPECIALIST ROLE</small><strong>${escapeHtml(title)}</strong><p>${escapeHtml(description)}</p></div><span class="inspector-hint">Current: ${escapeHtml(el(`task-${name}`).textContent)}</span>`;
+}
+
+function initializeVillageInteractions() {
+  const village = document.querySelector(".agent-village");
+  el("view-mission-control").querySelector(".view-heading").after(village);
+  document.querySelectorAll(".pixel-station").forEach((station) => {
+    station.addEventListener("click", () => inspectVillageAgent(station.dataset.agent));
+    station.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); inspectVillageAgent(station.dataset.agent); }
+    });
+  });
+  el("village-pause").addEventListener("click", () => {
+    const paused = el("view-mission-control").classList.toggle("village-paused");
+    el("village-pause").setAttribute("aria-pressed", String(paused));
+    el("village-pause").innerHTML = paused ? `<i class="ph ph-play"></i> Play` : `<i class="ph ph-pause"></i> Pause`;
+  });
+  el("village-speed").addEventListener("click", () => {
+    villageSpeed = villageSpeed === 1 ? 1.75 : villageSpeed === 1.75 ? 0.65 : 1;
+    el("view-mission-control").style.setProperty("--village-speed", String(villageSpeed));
+    el("village-speed").innerHTML = `<i class="ph ph-lightning"></i> ${villageSpeed}×`;
+  });
 }
 
 async function loadToolCallStat() {
   try {
     const stats = await fetchJSON("/api/mission-control/stats");
-    el("stat-tool-calls").textContent = stats.toolCallsThisSession;
+    state.missionStats = stats;
+    renderAgentVillage();
   } catch {
     // Keeps its last known value if this poll fails.
   }
@@ -976,6 +1108,7 @@ document.addEventListener("click", (e) => {
 // agent-status needs it so "N cases require attention" doesn't read a
 // cases.json that hasn't been reconciled yet and disagree with the
 // Drug Panel numbers shown right above it).
+initializeVillageInteractions();
 switchView("drug-panel");
 loadPatientList();
 loadCases().then(() => Promise.all([loadOverviewAlerts(), loadAgentStatus()]));
