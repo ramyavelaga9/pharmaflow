@@ -107,6 +107,26 @@ async function loadOverviewAlerts() {
   } catch (err) {
     el("interaction-alerts").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
   }
+
+  try {
+    const alerts = await fetchJSON("/api/supply-risk");
+    el("supply-risk-alerts").innerHTML = alerts.length
+      ? alerts
+          .map(
+            (a) => `
+        <div class="alert-row">
+          <span class="alert-row-main">
+            <div class="alert-row-title">${escapeHtml(a.medicationName)} &middot; ${escapeHtml(a.patientName)}</div>
+            <div class="alert-row-sub">${escapeHtml(a.status)} &middot; ${a.source === "fda_live" ? "live FDA data" : "demo data"}</div>
+          </span>
+          <span class="pill ${a.source === "fda_live" ? "pill-danger" : "pill-warn"}">${a.source === "fda_live" ? "FDA" : "demo"}</span>
+        </div>`
+          )
+          .join("")
+      : `<div class="empty-note"><i class="ph ph-check-circle"></i> No active FDA shortages match this panel's medications.</div>`;
+  } catch (err) {
+    el("supply-risk-alerts").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+  }
 }
 
 // ---- Patient detail ----
@@ -138,7 +158,7 @@ function backToOverview() {
   el("patient-detail").classList.add("hidden");
   el("alerts-section").classList.remove("hidden");
   el("view-title").textContent = "Panel overview";
-  el("view-subtitle").textContent = "Refill risk and interaction alerts across all patients";
+  el("view-subtitle").textContent = "Refill, interaction, and supply risk across all patients";
 }
 
 function renderPatientDetail(patient) {
@@ -273,6 +293,77 @@ async function sendChatMessage(message) {
     sendBtn.disabled = false;
   }
 }
+
+// ---- Mission Control: real agent activity, polled while the tab is visible ----
+
+let missionControlPollTimer = null;
+
+function eventIcon(type) {
+  return { session: "ph-plug", tool_call: "ph-wrench", tool_result: "ph-check", turn_done: "ph-flag-checkered" }[type] ?? "ph-dot";
+}
+
+async function loadMissionControlStats() {
+  try {
+    const stats = await fetchJSON("/api/mission-control/stats");
+    el("stat-active-cases").textContent = stats.activeCases;
+    el("stat-high-risk").textContent = stats.highRisk;
+    el("stat-tool-calls").textContent = stats.toolCallsThisSession;
+  } catch {
+    // Stat tiles just keep their last known value if this poll fails; the
+    // event feed below will still surface the connection problem.
+  }
+}
+
+async function loadEventFeed() {
+  try {
+    const events = await fetchJSON("/api/events?limit=30");
+    el("event-feed").innerHTML = events.length
+      ? events
+          .map(
+            (e) => `
+        <div class="event-row">
+          <i class="ph ${eventIcon(e.type)}"></i>
+          <span class="event-label">${escapeHtml(e.label)}</span>
+          <span class="event-time">${new Date(e.timestamp).toLocaleTimeString()}</span>
+        </div>`
+          )
+          .join("")
+      : `<p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Ask PharmaFlow something in the chat panel.</p>`;
+  } catch (err) {
+    el("event-feed").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function startMissionControlPolling() {
+  loadMissionControlStats();
+  loadEventFeed();
+  missionControlPollTimer = setInterval(() => {
+    loadMissionControlStats();
+    loadEventFeed();
+  }, 4000);
+}
+
+function stopMissionControlPolling() {
+  clearInterval(missionControlPollTimer);
+  missionControlPollTimer = null;
+}
+
+function switchView(viewName) {
+  document.querySelectorAll(".view-tab").forEach((tab) => {
+    const active = tab.dataset.view === viewName;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  el("view-patient-panel").classList.toggle("hidden", viewName !== "patient-panel");
+  el("view-mission-control").classList.toggle("hidden", viewName !== "mission-control");
+
+  if (viewName === "mission-control") startMissionControlPolling();
+  else stopMissionControlPolling();
+}
+
+document.querySelectorAll(".view-tab").forEach((tab) => {
+  tab.addEventListener("click", () => switchView(tab.dataset.view));
+});
 
 // ---- Wiring ----
 

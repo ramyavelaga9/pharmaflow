@@ -74,51 +74,69 @@ async function checkInteractionsFor(patient) {
   return hits;
 }
 
-function enrichPatient(patient) {
+function enrichPatient(patient, asOf = today()) {
   return {
     ...patient,
     medications: patient.medications.map((m) => ({
       ...m,
-      refill: refillStatus(m),
+      refill: refillStatus(m, asOf),
       adherence: adherenceStats(m),
     })),
   };
 }
 
-async function listPatients() {
+/** Worst refill urgency across a patient's medications, ranked overdue > critical > due-soon > ok. */
+function worstRefillStatus(enrichedMedications) {
+  const order = { overdue: 3, critical: 2, "due-soon": 1, ok: 0 };
+  return enrichedMedications.reduce(
+    (worst, m) => (order[m.refill.status] > order[worst] ? m.refill.status : worst),
+    "ok"
+  );
+}
+
+async function listPatients(asOf = today()) {
   const patients = await loadPatients();
   return patients.map((p) => {
-    const enriched = enrichPatient(p);
-    const worstRefill = enriched.medications.reduce((worst, m) => {
-      const order = { overdue: 3, critical: 2, "due-soon": 1, ok: 0 };
-      return order[m.refill.status] > order[worst] ? m.refill.status : worst;
-    }, "ok");
+    const enriched = enrichPatient(p, asOf);
     return {
       id: p.id,
       name: p.name,
       age: p.age,
       conditions: p.conditions,
       medicationCount: p.medications.length,
-      worstRefillStatus: worstRefill,
+      worstRefillStatus: worstRefillStatus(enriched.medications),
     };
   });
 }
 
-async function getPatient(patientId) {
+/** Pure aggregate over already-summarized patients (from listPatients), for the Mission Control stat tiles. */
+function summarizePanel(patientSummaries) {
+  const highRiskStatuses = new Set(["critical", "overdue"]);
+  return {
+    activeCases: patientSummaries.filter((p) => p.worstRefillStatus !== "ok").length,
+    highRisk: patientSummaries.filter((p) => highRiskStatuses.has(p.worstRefillStatus)).length,
+  };
+}
+
+async function getPanelStats(asOf = today()) {
+  return summarizePanel(await listPatients(asOf));
+}
+
+async function getPatient(patientId, asOf = today()) {
   const patients = await loadPatients();
   const patient = patients.find((p) => p.id === patientId);
   if (!patient) return null;
-  const enriched = enrichPatient(patient);
+  const enriched = enrichPatient(patient, asOf);
   const interactions = await checkInteractionsFor(patient);
   return { ...enriched, interactions };
 }
 
-async function getRefillAlerts(daysAhead = 7) {
+async function getRefillAlerts(daysAhead = 7, asOf = today()) {
   const patients = await loadPatients();
   const alerts = [];
   for (const p of patients) {
     for (const m of p.medications) {
-      const r = refillStatus(m);
+      const r = refillStatus(m, asOf);
       if (r.status !== "ok" && r.daysUntilDue <= daysAhead) {
         alerts.push({
           patientId: p.id,
@@ -168,4 +186,6 @@ export {
   loadPatients,
   refillStatus,
   adherenceStats,
+  summarizePanel,
+  getPanelStats,
 };

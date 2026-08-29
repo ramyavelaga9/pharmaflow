@@ -41,55 +41,116 @@
 
     <main class="main">
       <header class="topbar">
-        <div>
-          <h1 id="view-title">Panel overview</h1>
-          <p id="view-subtitle" class="muted">Refill risk and interaction alerts across all patients</p>
-        </div>
+        <nav class="view-tabs" role="tablist" aria-label="Dashboard view">
+          <button class="view-tab active" data-view="patient-panel" role="tab" aria-selected="true">Patient Panel</button>
+          <button class="view-tab" data-view="mission-control" role="tab" aria-selected="false">Mission Control</button>
+        </nav>
         <button id="chat-toggle" class="chat-toggle"><i class="ph ph-chats-circle"></i> Ask PharmaFlow</button>
       </header>
 
-      <section id="alerts-section" class="alerts-grid">
-        <div class="alert-card">
-          <div class="alert-card-head">
-            <span class="dot dot-critical" aria-hidden="true"></span>
-            <h2>Refill alerts</h2>
-          </div>
-          <div id="refill-alerts" class="alert-list">
-            <div class="skeleton-row"></div>
-            <div class="skeleton-row"></div>
-          </div>
+      <div id="view-patient-panel" class="view">
+        <div class="view-heading">
+          <h1 id="view-title">Panel overview</h1>
+          <p id="view-subtitle" class="muted">Refill, interaction, and supply risk across all patients</p>
         </div>
-        <div class="alert-card">
-          <div class="alert-card-head">
-            <span class="dot dot-warn" aria-hidden="true"></span>
-            <h2>Interaction risk</h2>
-          </div>
-          <div id="interaction-alerts" class="alert-list">
-            <div class="skeleton-row"></div>
-            <div class="skeleton-row"></div>
-          </div>
-        </div>
-      </section>
 
-      <section id="patient-detail" class="patient-detail hidden"></section>
+        <section id="alerts-section" class="alerts-grid">
+          <div class="alert-card">
+            <div class="alert-card-head">
+              <span class="dot dot-critical" aria-hidden="true"></span>
+              <h2>Refill alerts</h2>
+            </div>
+            <div id="refill-alerts" class="alert-list">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
+          <div class="alert-card">
+            <div class="alert-card-head">
+              <span class="dot dot-warn" aria-hidden="true"></span>
+              <h2>Interaction risk</h2>
+            </div>
+            <div id="interaction-alerts" class="alert-list">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
+          <div class="alert-card">
+            <div class="alert-card-head">
+              <span class="dot dot-warn" aria-hidden="true"></span>
+              <h2>Supply risk (FDA)</h2>
+            </div>
+            <div id="supply-risk-alerts" class="alert-list">
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="patient-detail" class="patient-detail hidden"></section>
+      </div>
+
+      <div id="view-mission-control" class="view hidden">
+        <div class="view-heading">
+          <h1>Mission Control</h1>
+          <p class="muted">Real agent activity for this session, not a simulated preview.</p>
+        </div>
+
+        <section class="stat-grid">
+          <div class="stat-tile">
+            <div class="stat-value" id="stat-active-cases">&ndash;</div>
+            <div class="stat-label">Active cases</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-value" id="stat-high-risk">&ndash;</div>
+            <div class="stat-label">High risk</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-value" id="stat-tool-calls">&ndash;</div>
+            <div class="stat-label">Tool calls this session</div>
+          </div>
+        </section>
+
+        <section class="mission-grid">
+          <div class="mission-card">
+            <h2><i class="ph ph-activity"></i> Live event feed</h2>
+            <div id="event-feed" class="event-feed">
+              <p class="empty-note"><i class="ph ph-moon-stars"></i> No agent activity yet. Ask PharmaFlow something in the chat panel.</p>
+            </div>
+          </div>
+          <div class="mission-card">
+            <h2><i class="ph ph-flow-arrow"></i> Execution path</h2>
+            <div class="execution-graph">
+              <div class="graph-node">User</div>
+              <div class="graph-arrow" aria-hidden="true">&darr;</div>
+              <div class="graph-node graph-node-accent">PharmaFlow agent (TrueForge)</div>
+              <div class="graph-arrow" aria-hidden="true">&darr;</div>
+              <div class="graph-node">pharmaflow-tools MCP</div>
+              <div class="graph-arrow" aria-hidden="true">&darr;</div>
+              <div class="graph-node">fda-shortages MCP</div>
+            </div>
+            <p class="muted small">This reflects what actually runs today. A specialized subagent split (supply, patient-impact, safety) extends this path in a later milestone, once it exists.</p>
+          </div>
+        </section>
+      </div>
     </main>
 
     <aside id="chat-panel" class="chat-panel hidden">
       <div class="chat-header">
         <div>
           <strong>Ask PharmaFlow</strong>
-          <div class="muted small">Agent runtime: TrueForge &middot; Tools: pharmaflow-tools MCP</div>
+          <div class="muted small">Agent runtime: TrueForge &middot; Tools: pharmaflow-tools, fda-shortages MCP</div>
         </div>
         <button id="chat-close" class="icon-btn" aria-label="Close chat"><i class="ph ph-x"></i></button>
       </div>
       <div id="chat-messages" class="chat-messages">
         <div class="chat-msg chat-msg-agent">
           Hi, I'm PharmaFlow. Ask me things like <em>"who's at risk of a refill gap this week?"</em> or
-          <em>"check Eleanor Whitfield for interactions."</em>
+          <em>"is anyone affected by a current FDA shortage?"</em>
         </div>
       </div>
       <form id="chat-form" class="chat-form">
-        <input id="chat-input" type="text" placeholder="Ask about refills, interactions, adherence" autocomplete="off" />
+        <input id="chat-input" type="text" placeholder="Ask about refills, interactions, shortages" autocomplete="off" />
         <button type="submit" class="send-btn" aria-label="Send"><i class="ph-fill ph-arrow-up"></i></button>
       </form>
     </aside>

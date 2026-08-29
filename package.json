@@ -6,9 +6,11 @@
   "private": true,
   "scripts": {
     "mcp": "node src/mcp-server.mjs",
+    "fda-mcp": "node src/fda-mcp-server.mjs",
     "backend": "node src/backend.mjs",
     "setup": "node src/setup-trueforge.mjs",
-    "dev": "concurrently -n mcp,backend -c blue,green \"npm:mcp\" \"npm:backend\""
+    "dev": "concurrently -n mcp,fda-mcp,backend -c blue,cyan,green \"npm:mcp\" \"npm:fda-mcp\" \"npm:backend\"",
+    "test": "node --test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
