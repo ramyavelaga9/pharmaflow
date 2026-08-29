@@ -307,6 +307,7 @@ button:active {
 }
 .view-heading-row h1 { margin: 0; }
 .view-heading-row .pill { gap: 6px; }
+.live-badge span:last-child { font-variant-numeric: tabular-nums; }
 
 /* ---- Agent status strip ---- */
 .status-strip {

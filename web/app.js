@@ -254,7 +254,6 @@ async function openPatient(id) {
   state.activePatientId = id;
   renderPatientList();
   el("alerts-section").classList.add("hidden");
-  el("agent-status-strip").classList.add("hidden");
   el("supply-risk-banner").classList.add("hidden");
   const detail = el("patient-detail");
   detail.classList.remove("hidden");
@@ -278,10 +277,9 @@ function backToOverview() {
   renderPatientList();
   el("patient-detail").classList.add("hidden");
   el("alerts-section").classList.remove("hidden");
-  el("agent-status-strip").classList.remove("hidden");
   el("supply-risk-banner").classList.remove("hidden");
-  el("view-title").textContent = "Medication Continuity Command Center";
-  el("view-subtitle").textContent = "PharmaFlow is monitoring medication supply, refill, and safety signals across the patient panel.";
+  el("view-title").textContent = "Patient Panel";
+  el("view-subtitle").textContent = "Browse patients and their current refill, interaction, and supply-risk status.";
 }
 
 function renderPatientDetail(patient) {
@@ -623,9 +621,22 @@ async function loadDrugPanel() {
     el("drug-stat-recalls").textContent = withRecall.length;
     el("drug-stat-patients").textContent = affectedPatientIds.size;
     renderDrugList();
+    el("drug-panel-updated").textContent = new Date().toLocaleTimeString();
   } catch (err) {
     el("drug-list").innerHTML = `<p class="error-note">${escapeHtml(err.message)}</p>`;
   }
+}
+
+let drugPanelPollTimer = null;
+
+function startDrugPanelPolling() {
+  loadDrugPanel();
+  drugPanelPollTimer = setInterval(loadDrugPanel, 30000);
+}
+
+function stopDrugPanelPolling() {
+  clearInterval(drugPanelPollTimer);
+  drugPanelPollTimer = null;
 }
 
 /** Inline detail for one drug - rendered directly under its own row, not appended after the whole list. */
@@ -759,7 +770,8 @@ function switchView(viewName) {
   if (viewName === "mission-control") startMissionControlPolling();
   else stopMissionControlPolling();
 
-  if (viewName === "drug-panel") loadDrugPanel();
+  if (viewName === "drug-panel") startDrugPanelPolling();
+  else stopDrugPanelPolling();
 }
 
 document.querySelectorAll(".view-tab").forEach((tab) => {
@@ -801,11 +813,15 @@ document.addEventListener("click", (e) => {
   if (rejectBtn) return respondToApproval(rejectBtn.dataset.reject, "deny");
 });
 
-// Cases load (and reconcile against live data) before anything that reads
-// them: overview alerts need it to link a supply-risk row to its real
-// case from the very first paint, and agent-status needs it so "N cases
-// require attention" doesn't read a cases.json that hasn't been
-// reconciled yet and transiently disagree with the alerts right below it.
+// Drug Panel is the default/first tab - switchView sets its tab/view state
+// and starts its own polling. The sidebar and Patient Panel's alert data
+// load eagerly regardless of which tab is active: the sidebar is always
+// visible, and cases must be reconciled before anything that reads them
+// (overview alerts need it to link a supply-risk row to its real case;
+// agent-status needs it so "N cases require attention" doesn't read a
+// cases.json that hasn't been reconciled yet and disagree with the
+// Drug Panel numbers shown right above it).
+switchView("drug-panel");
 loadPatientList();
 loadCases().then(() => Promise.all([loadOverviewAlerts(), loadAgentStatus()]));
 setInterval(loadAgentStatus, 5000);

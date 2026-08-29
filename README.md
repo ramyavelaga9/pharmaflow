@@ -148,12 +148,13 @@ npm run setup
 npm run backend
 ```
 
-Open **http://localhost:8787** for the PharmaFlow dashboard: a
-**Patient Panel** tab (a live agent-status strip, a supply-risk summary,
-refill/interaction alerts, an "Open Agent" chat drawer), a **Drug Panel**
-tab (every medication on the panel with its real active FDA shortage/recall
-status and who's affected - click a drug for full detail), and a
-**Mission Control** tab (real case list with case detail + approve/reject,
+Open **http://localhost:8787** for the PharmaFlow dashboard: **Drug Panel**
+is the default tab (the command-center title, a live agent-status strip,
+and every medication on the panel with its real active FDA shortage/recall
+status and who's affected - click a drug for full detail, expands inline
+accordion-style), then **Patient Panel** (a supply-risk summary, refill/
+interaction alerts, an "Open Agent" chat drawer), and **Mission Control**
+(real case list with case detail + approve/reject,
 a live event feed, and the agent's current execution path) — or the
 TrueForge chat UI directly at **http://localhost:8790**.
 
