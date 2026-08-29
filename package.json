@@ -1,0 +1,24 @@
+{
+  "name": "pharmaflow",
+  "version": "0.1.0",
+  "description": "PharmaFlow — a Medication Continuity Agent built on TrueForge",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "mcp": "node src/mcp-server.mjs",
+    "backend": "node src/backend.mjs",
+    "setup": "node src/setup-trueforge.mjs",
+    "dev": "concurrently -n mcp,backend -c blue,green \"npm:mcp\" \"npm:backend\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@truefoundry/trueforge-sdk": "^0.1.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

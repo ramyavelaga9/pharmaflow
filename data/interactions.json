@@ -1,0 +1,32 @@
+[
+  {
+    "a": "Warfarin",
+    "b": "Ibuprofen",
+    "severity": "high",
+    "note": "NSAIDs potentiate Warfarin's anticoagulant effect and independently irritate the GI lining, combined use significantly raises bleeding risk."
+  },
+  {
+    "a": "Warfarin",
+    "b": "Naproxen",
+    "severity": "high",
+    "note": "Same class interaction as Warfarin + Ibuprofen: increased bleeding risk from combined anticoagulation and NSAID platelet effects."
+  },
+  {
+    "a": "Lisinopril",
+    "b": "Ibuprofen",
+    "severity": "moderate",
+    "note": "NSAIDs can blunt the blood-pressure-lowering effect of ACE inhibitors and reduce renal blood flow, especially in patients with existing kidney impairment."
+  },
+  {
+    "a": "Lisinopril",
+    "b": "Naproxen",
+    "severity": "moderate",
+    "note": "Same ACE-inhibitor + NSAID concern; particularly relevant for patients with reduced kidney function (the 'triple whammy' risk is worse with a diuretic added)."
+  },
+  {
+    "a": "Sertraline",
+    "b": "Sumatriptan",
+    "severity": "moderate",
+    "note": "Combining an SSRI with a triptan carries a labeled risk of serotonin syndrome; monitor for agitation, tremor, or autonomic instability."
+  }
+]
