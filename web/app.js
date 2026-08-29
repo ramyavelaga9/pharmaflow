@@ -106,14 +106,18 @@ async function loadAgentStatus() {
 
 // ---- Sidebar: patient list, with real per-patient concern counts ----
 
+/** Renders each real concern count as a small colored tag, not a plain-text line. */
 function patientConcernSummary(patientId) {
   const counts = [
-    [state.refillAlerts.filter((a) => a.patientId === patientId).length, "refill"],
-    [state.interactionAlerts.filter((a) => a.patientId === patientId).length, "interaction"],
-    [state.supplyRiskAlerts.filter((a) => a.patientId === patientId).length, "supply risk"],
+    [state.refillAlerts.filter((a) => a.patientId === patientId).length, "refill", "pill-danger"],
+    [state.interactionAlerts.filter((a) => a.patientId === patientId).length, "interaction", "pill-warn"],
+    [state.supplyRiskAlerts.filter((a) => a.patientId === patientId).length, "supply risk", "pill-danger"],
   ];
-  const parts = counts.filter(([count]) => count > 0).map(([count, label]) => `${count} ${label}`);
-  return parts.length ? parts.join(" · ") : "No active concerns";
+  const tags = counts
+    .filter(([count]) => count > 0)
+    .map(([count, label, tone]) => `<span class="pill ${tone} pill-xs">${count} ${escapeHtml(label)}</span>`)
+    .join("");
+  return tags || `<span class="pill pill-ok pill-xs">No active concerns</span>`;
 }
 
 async function loadPatientList() {
@@ -139,7 +143,7 @@ function renderPatientList() {
         <span class="patient-row-info">
           <div class="patient-row-name">${escapeHtml(p.name)}</div>
           <div class="patient-row-meta">${p.age} &middot; ${p.medicationCount} medications</div>
-          <div class="patient-row-concerns">${escapeHtml(patientConcernSummary(p.id))}</div>
+          <div class="patient-row-concerns">${patientConcernSummary(p.id)}</div>
         </span>
       </button>`
     )
@@ -239,11 +243,16 @@ function renderSupplyRiskBanner() {
 
   banner.innerHTML = `
     <button class="supply-banner-inner" data-goto-mission-control>
-      <div class="supply-banner-head"><span class="dot dot-critical"></span><strong>Active supply risks</strong></div>
+      <div class="supply-banner-head">
+        <span class="supply-banner-icon"><i class="ph-fill ph-warning"></i></span>
+        <div>
+          <strong>Active supply risks</strong>
+          <div class="muted small">FDA updates require continuity follow-up</div>
+        </div>
+      </div>
       <div class="supply-banner-stats">
-        <div><span class="supply-banner-value">${patientCount}</span> patient${patientCount === 1 ? "" : "s"}</div>
-        <div><span class="supply-banner-value">${medCount}</span> medication${medCount === 1 ? "" : "s"}</div>
-        <div>FDA updates detected</div>
+        <div class="supply-banner-stat"><span class="supply-banner-value">${patientCount}</span><span class="supply-banner-label">Patient${patientCount === 1 ? "" : "s"}</span></div>
+        <div class="supply-banner-stat"><span class="supply-banner-value">${medCount}</span><span class="supply-banner-label">Medication${medCount === 1 ? "" : "s"}</span></div>
       </div>
     </button>`;
 }
