@@ -1,0 +1,184 @@
+[
+  {
+    "id": "PF-1001",
+    "patientId": "p2",
+    "patientName": "Marcus Chen",
+    "medicationName": "Sodium Bicarbonate",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current (Pharmacy stock: 0 units)",
+    "priority": "high",
+    "evidence": {
+      "source": "fda_live",
+      "status": "Current",
+      "updateDate": "08/25/2026",
+      "daysUntilDue": -2
+    },
+    "status": "approval_required",
+    "pendingApproval": {
+      "toolCallId": "call_sodium_bicarb_alt",
+      "toolName": "propose_alternative_supply",
+      "args": {
+        "caseId": "PF-1001",
+        "alternativeDrug": "Potassium Citrate",
+        "rationale": "Sodium Bicarbonate is out of stock (0 units). Potassium Citrate provides alkalinization therapy for CKD Stage 3."
+      }
+    },
+    "pharmacistReview": null,
+    "fulfillment": {
+      "status": "approval_required",
+      "lastCheckedStock": 0,
+      "proposedAlternative": "Potassium Citrate"
+    },
+    "createdAt": "2026-08-29T22:13:33.853Z",
+    "updatedAt": "2026-08-29T23:10:00.000Z"
+  },
+  {
+    "id": "PF-1002",
+    "patientId": "p3",
+    "patientName": "Priya Ramaswami",
+    "medicationName": "Sumatriptan",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: To Be Discontinued (Pharmacy stock: 0 units)",
+    "priority": "high",
+    "evidence": {
+      "source": "fda_live",
+      "status": "To Be Discontinued",
+      "updateDate": "09/08/2025",
+      "daysUntilDue": -19
+    },
+    "status": "approval_required",
+    "pendingApproval": {
+      "toolCallId": "call_sumatriptan_alt",
+      "toolName": "propose_alternative_supply",
+      "args": {
+        "caseId": "PF-1002",
+        "alternativeDrug": "Rizatriptan",
+        "rationale": "Sumatriptan is out of stock (0 units) and flagged to be discontinued. Rizatriptan is a vetted triptan class alternative for acute migraine."
+      }
+    },
+    "pharmacistReview": null,
+    "fulfillment": {
+      "status": "approval_required",
+      "lastCheckedStock": 0,
+      "proposedAlternative": "Rizatriptan"
+    },
+    "createdAt": "2026-08-29T22:13:33.854Z",
+    "updatedAt": "2026-08-29T23:10:00.000Z"
+  },
+  {
+    "id": "PF-1003",
+    "patientId": "p1",
+    "patientName": "Eleanor Whitfield",
+    "medicationName": "Warfarin + Ibuprofen",
+    "triggerType": "interaction_risk",
+    "triggerSummary": "Potential interaction: Warfarin + Ibuprofen",
+    "priority": "high",
+    "evidence": {
+      "source": "synthetic_interaction_table",
+      "note": "NSAIDs potentiate Warfarin's anticoagulant effect and independently irritate the GI lining, combined use significantly raises bleeding risk.",
+      "severity": "high"
+    },
+    "status": "detected",
+    "pendingApproval": null,
+    "pharmacistReview": null,
+    "fulfillment": null,
+    "createdAt": "2026-08-29T22:13:33.854Z",
+    "updatedAt": "2026-08-29T22:13:33.854Z"
+  },
+  {
+    "id": "PF-1004",
+    "patientId": "p1",
+    "patientName": "Eleanor Whitfield",
+    "medicationName": "Lisinopril",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current",
+    "priority": "high",
+    "evidence": {
+      "source": "demo",
+      "status": "Current",
+      "updateDate": "08/20/2026",
+      "daysUntilDue": 1
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "auto-reordered",
+      "note": "Sufficient stock available (76 units). Order ORD-LIS-101 placed automatically.",
+      "resolvedAt": "2026-08-29T23:10:00.000Z"
+    },
+    "fulfillment": {
+      "status": "reordered",
+      "method": "auto_reorder",
+      "drugName": "Lisinopril 10mg",
+      "quantity": "30 units",
+      "stockAtOrder": 76,
+      "orderId": "ORD-LIS-101"
+    },
+    "createdAt": "2026-08-29T22:17:27.688Z",
+    "updatedAt": "2026-08-29T23:10:00.000Z"
+  },
+  {
+    "id": "PF-1005",
+    "patientId": "p2",
+    "patientName": "Marcus Chen",
+    "medicationName": "Lisinopril",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current",
+    "priority": "high",
+    "evidence": {
+      "source": "demo",
+      "status": "Current",
+      "updateDate": "08/20/2026",
+      "daysUntilDue": 0
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "auto-reordered",
+      "note": "Sufficient stock available (76 units). Order ORD-LIS-102 placed automatically.",
+      "resolvedAt": "2026-08-29T23:10:00.000Z"
+    },
+    "fulfillment": {
+      "status": "reordered",
+      "method": "auto_reorder",
+      "drugName": "Lisinopril 20mg",
+      "quantity": "30 units",
+      "stockAtOrder": 76,
+      "orderId": "ORD-LIS-102"
+    },
+    "createdAt": "2026-08-29T22:17:27.688Z",
+    "updatedAt": "2026-08-29T23:10:00.000Z"
+  },
+  {
+    "id": "PF-1006",
+    "patientId": "p1",
+    "patientName": "Eleanor Whitfield",
+    "medicationName": "Warfarin",
+    "triggerType": "supply_risk",
+    "triggerSummary": "FDA shortage: Current",
+    "priority": "high",
+    "evidence": {
+      "source": "demo",
+      "status": "Current",
+      "updateDate": "08/15/2026",
+      "daysUntilDue": 3
+    },
+    "status": "resolved",
+    "pendingApproval": null,
+    "pharmacistReview": {
+      "decision": "auto-reordered",
+      "note": "Sufficient stock available (42 units). Order ORD-WAR-103 placed automatically.",
+      "resolvedAt": "2026-08-29T23:10:00.000Z"
+    },
+    "fulfillment": {
+      "status": "reordered",
+      "method": "auto_reorder",
+      "drugName": "Warfarin 5mg",
+      "quantity": "30 units",
+      "stockAtOrder": 42,
+      "orderId": "ORD-WAR-103"
+    },
+    "createdAt": "2026-08-29T22:20:43.472Z",
+    "updatedAt": "2026-08-29T23:10:00.000Z"
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "_label": "Static reference candidates for pharmacist review when a drug is out of stock - not an AI-generated substitution. PharmaFlow may only propose a drug from this list, and never without pharmacist approval.",
+  "alternatives": {
+    "Sodium Bicarbonate": [
+      {
+        "name": "Potassium Citrate",
+        "note": "Alternative alkalinizing agent used in CKD metabolic acidosis management. Renal dosing must be confirmed by the prescriber before use."
+      }
+    ],
+    "Sumatriptan": [
+      {
+        "name": "Rizatriptan",
+        "note": "Same drug class (triptan) for acute migraine. Carries the same SSRI interaction consideration as sumatriptan; pharmacist should re-screen before dispensing."
+      }
+    ]
+  }
+}

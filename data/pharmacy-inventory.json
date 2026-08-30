@@ -1,0 +1,13 @@
+{
+  "_label": "Synthetic pharmacy inventory for this prototype - not a real pharmacy system integration.",
+  "stock": {
+    "Warfarin": 42,
+    "Metformin": 118,
+    "Lisinopril": 76,
+    "Ibuprofen": 200,
+    "Naproxen": 54,
+    "Sodium Bicarbonate": 0,
+    "Sertraline": 33,
+    "Sumatriptan": 0
+  }
+}

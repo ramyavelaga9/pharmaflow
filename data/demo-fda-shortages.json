@@ -1,0 +1,22 @@
+[
+  {
+    "generic_name": "Warfarin Sodium Tablets",
+    "openfda": { "generic_name": ["WARFARIN SODIUM"], "brand_name": ["COUMADIN"] },
+    "status": "Current",
+    "update_date": "08/15/2026",
+    "presentation": "Warfarin Sodium, Tablets, 5 mg",
+    "company_name": "Demo Pharma Co.",
+    "related_info": "Demand increase reported by manufacturer.",
+    "_demoNote": "Synthetic fixture for offline/demo mode - not a real FDA record."
+  },
+  {
+    "generic_name": "Lisinopril Tablets",
+    "openfda": { "generic_name": ["LISINOPRIL"], "brand_name": ["PRINIVIL"] },
+    "status": "Current",
+    "update_date": "08/20/2026",
+    "presentation": "Lisinopril, Tablets, 10 mg",
+    "company_name": "Demo Pharma Co.",
+    "related_info": "Manufacturing delay reported.",
+    "_demoNote": "Synthetic fixture for offline/demo mode - not a real FDA record."
+  }
+]

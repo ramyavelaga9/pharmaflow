@@ -1,0 +1,819 @@
+[
+  {
+    "id": "p1",
+    "name": "Eleanor Whitfield",
+    "age": 74,
+    "conditions": [
+      "Atrial Fibrillation",
+      "Type 2 Diabetes",
+      "Hypertension"
+    ],
+    "medications": [
+      {
+        "id": "p1-m1",
+        "name": "Warfarin",
+        "dose": "5mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-03",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p1-m2",
+        "name": "Metformin",
+        "dose": "500mg",
+        "frequency": "Twice daily",
+        "daysSupply": 90,
+        "lastFilled": "2026-06-18",
+        "prescriber": "Dr. Patel (Endocrinology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p1-m3",
+        "name": "Lisinopril",
+        "dose": "10mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-01",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p1-m4",
+        "name": "Ibuprofen",
+        "dose": "400mg PRN",
+        "frequency": "As needed for pain",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-20",
+        "prescriber": "Self / OTC (patient-reported)",
+        "adherenceLog": [
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p2",
+    "name": "Marcus Chen",
+    "age": 58,
+    "conditions": [
+      "Chronic Kidney Disease (Stage 3)",
+      "Hypertension"
+    ],
+    "medications": [
+      {
+        "id": "p2-m1",
+        "name": "Lisinopril",
+        "dose": "20mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-07-31",
+        "prescriber": "Dr. Osei (Nephrology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p2-m2",
+        "name": "Naproxen",
+        "dose": "220mg PRN",
+        "frequency": "As needed for back pain",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-10",
+        "prescriber": "Self / OTC (patient-reported)",
+        "adherenceLog": [
+          true,
+          false,
+          true,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          true,
+          false
+        ]
+      },
+      {
+        "id": "p2-m3",
+        "name": "Sodium Bicarbonate",
+        "dose": "650mg",
+        "frequency": "Twice daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-07-29",
+        "prescriber": "Dr. Osei (Nephrology)",
+        "adherenceLog": [
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p3",
+    "name": "Priya Ramaswami",
+    "age": 41,
+    "conditions": [
+      "Major Depressive Disorder",
+      "Migraine"
+    ],
+    "medications": [
+      {
+        "id": "p3-m1",
+        "name": "Sertraline",
+        "dose": "100mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-05",
+        "prescriber": "Dr. Falk (Psychiatry)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p3-m2",
+        "name": "Sumatriptan",
+        "dose": "50mg PRN",
+        "frequency": "As needed for migraine",
+        "daysSupply": 9,
+        "lastFilled": "2026-08-02",
+        "prescriber": "Dr. Falk (Psychiatry)",
+        "adherenceLog": [
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p4",
+    "name": "Arthur Vance",
+    "age": 68,
+    "conditions": [
+      "Hyperlipidemia",
+      "Coronary Artery Disease",
+      "Hypertension"
+    ],
+    "medications": [
+      {
+        "id": "p4-m1",
+        "name": "Atorvastatin",
+        "dose": "40mg",
+        "frequency": "Once daily at bedtime",
+        "daysSupply": 90,
+        "lastFilled": "2026-06-10",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p4-m2",
+        "name": "Amlodipine",
+        "dose": "5mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-08",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p4-m3",
+        "name": "Metoprolol Succinate",
+        "dose": "50mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-01",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p4-m4",
+        "name": "Clopidogrel",
+        "dose": "75mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-07-28",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p5",
+    "name": "Sophia Rodriguez",
+    "age": 52,
+    "conditions": [
+      "Asthma",
+      "GERD",
+      "Osteoarthritis"
+    ],
+    "medications": [
+      {
+        "id": "p5-m1",
+        "name": "Albuterol HFA",
+        "dose": "90mcg",
+        "frequency": "2 puffs Q4H PRN",
+        "daysSupply": 30,
+        "lastFilled": "2026-07-15",
+        "prescriber": "Dr. Martinez (Pulmonology)",
+        "adherenceLog": [
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "id": "p5-m2",
+        "name": "Omeprazole",
+        "dose": "20mg",
+        "frequency": "Once daily before breakfast",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-12",
+        "prescriber": "Dr. Chang (Gastroenterology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p5-m3",
+        "name": "Meloxicam",
+        "dose": "15mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-04",
+        "prescriber": "Dr. Gupta (Rheumatology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p6",
+    "name": "David O'Connor",
+    "age": 63,
+    "conditions": [
+      "Type 2 Diabetes",
+      "Diabetic Neuropathy",
+      "BPH"
+    ],
+    "medications": [
+      {
+        "id": "p6-m1",
+        "name": "Insulin Glargine",
+        "dose": "20 units",
+        "frequency": "Once daily at bedtime",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-14",
+        "prescriber": "Dr. Patel (Endocrinology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p6-m2",
+        "name": "Gabapentin",
+        "dose": "300mg",
+        "frequency": "Three times daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-02",
+        "prescriber": "Dr. Patel (Endocrinology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p6-m3",
+        "name": "Tamsulosin",
+        "dose": "0.4mg",
+        "frequency": "Once daily after dinner",
+        "daysSupply": 90,
+        "lastFilled": "2026-06-01",
+        "prescriber": "Dr. Miller (Urology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p7",
+    "name": "Maya Patel",
+    "age": 35,
+    "conditions": [
+      "Generalized Anxiety Disorder",
+      "Hypothyroidism"
+    ],
+    "medications": [
+      {
+        "id": "p7-m1",
+        "name": "Levothyroxine",
+        "dose": "75mcg",
+        "frequency": "Once daily in morning",
+        "daysSupply": 90,
+        "lastFilled": "2026-06-20",
+        "prescriber": "Dr. Patel (Endocrinology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p7-m2",
+        "name": "Escitalopram",
+        "dose": "10mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-11",
+        "prescriber": "Dr. Falk (Psychiatry)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p8",
+    "name": "James Thorne",
+    "age": 79,
+    "conditions": [
+      "Congestive Heart Failure",
+      "Chronic Kidney Disease (Stage 4)",
+      "Gout"
+    ],
+    "medications": [
+      {
+        "id": "p8-m1",
+        "name": "Furosemide",
+        "dose": "40mg",
+        "frequency": "Once daily in morning",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-07",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p8-m2",
+        "name": "Allopurinol",
+        "dose": "100mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-07-29",
+        "prescriber": "Dr. Osei (Nephrology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p8-m3",
+        "name": "Carvedilol",
+        "dose": "12.5mg",
+        "frequency": "Twice daily with food",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-05",
+        "prescriber": "Dr. Nkemelu (Cardiology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p9",
+    "name": "Chloe Dupont",
+    "age": 29,
+    "conditions": [
+      "Rheumatoid Arthritis",
+      "Iron Deficiency Anemia"
+    ],
+    "medications": [
+      {
+        "id": "p9-m1",
+        "name": "Methotrexate",
+        "dose": "15mg",
+        "frequency": "Once weekly",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-01",
+        "prescriber": "Dr. Gupta (Rheumatology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p9-m2",
+        "name": "Ferrous Sulfate",
+        "dose": "325mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-15",
+        "prescriber": "Dr. Gupta (Rheumatology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  },
+  {
+    "id": "p10",
+    "name": "Robert Sterling",
+    "age": 71,
+    "conditions": [
+      "Parkinson's Disease",
+      "Insomnia",
+      "Hypertension"
+    ],
+    "medications": [
+      {
+        "id": "p10-m1",
+        "name": "Carbidopa-Levodopa",
+        "dose": "25/100mg",
+        "frequency": "Three times daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-10",
+        "prescriber": "Dr. Vance (Neurology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "p10-m2",
+        "name": "Losartan",
+        "dose": "50mg",
+        "frequency": "Once daily",
+        "daysSupply": 30,
+        "lastFilled": "2026-08-03",
+        "prescriber": "Dr. Vance (Neurology)",
+        "adherenceLog": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ]
+  }
+]
