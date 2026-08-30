@@ -22,8 +22,6 @@ Actions are separated by consequence: a same-drug refill from available stock ha
 
 This project was built on [TrueForge](https://github.com/truefoundry/trueforge), the open-source agent harness, for the [Agent Harness Hackathon](https://www.wemakedevs.org/blogs/agent-harness-hackathon-kick-off) — specifically to exercise TrueForge as a real execution harness rather than a chat wrapper around a model: registered MCP tools the model actually discovers and calls, git-backed procedural skills, a persistent session per case, streamed model/tool events, and gated approvals that pause and resume an exact turn. See [How TrueForge is used](#how-trueforge-is-used) for the mechanics.
 
-> **Prototype only:** PharmaFlow uses synthetic patient, pharmacy, and interaction data. It is not a clinical decision-support system and must not be used for real medication decisions.
-
 ## Product tour
 
 ### Drug Panel
