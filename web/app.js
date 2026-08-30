@@ -3,6 +3,10 @@
 const state = {
   patients: [],
   activePatientId: null,
+  // Bumped on every openPatient() call, including repeat calls for the same
+  // patient — an id match alone can't distinguish an older in-flight
+  // request from the latest one when both target the same patient.
+  patientRequestToken: 0,
   activeCaseId: null,
   cases: [],
   drugs: [],
@@ -235,6 +239,11 @@ async function loadOverviewAlerts() {
 
 async function openPatient(id) {
   state.activePatientId = id;
+  // A patient-id match alone can't tell two in-flight requests for the SAME
+  // patient apart (e.g. a rapid double-click, or A -> overview -> A), so an
+  // older response could still overwrite a newer one. A token unique to
+  // *this* call can.
+  const requestToken = ++state.patientRequestToken;
   renderPatientList();
   el("alerts-section").classList.add("hidden");
   const detail = el("patient-detail");
@@ -243,10 +252,10 @@ async function openPatient(id) {
 
   try {
     const patient = await fetchJSON(`/api/patients/${id}`);
-    // A newer selection (or a return to overview) may have happened while
-    // this fetch was in flight; render only if `id` is still the active
-    // patient, or an out-of-order response can overwrite a newer view.
-    if (state.activePatientId !== id) return;
+    // Render only if this call is still the most recent one for the active
+    // patient — a newer selection, a repeat selection, or a return to
+    // overview may have happened while this fetch was in flight.
+    if (state.activePatientId !== id || state.patientRequestToken !== requestToken) return;
     el("view-title").textContent = patient.name;
     el("view-subtitle").textContent = `${patient.age} years old · ${patient.conditions.join(", ")}`;
     detail.innerHTML = renderPatientDetail(patient);
@@ -254,7 +263,7 @@ async function openPatient(id) {
       btn.addEventListener("click", () => logDose(patient.id, btn.dataset.med, btn.dataset.log === "taken"));
     });
   } catch (err) {
-    if (state.activePatientId !== id) return;
+    if (state.activePatientId !== id || state.patientRequestToken !== requestToken) return;
     detail.innerHTML = `<p class="error-note">Couldn't load patient: ${escapeHtml(err.message)}</p>`;
   }
 }

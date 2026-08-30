@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, utimes, unlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { refillStatus, summarizePanel, logDose, getRefillAlerts, getPatient } from "../src/store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PATIENTS_PATH = path.join(__dirname, "..", "data", "patients.json");
+const PATIENTS_LOCK_PATH = `${PATIENTS_PATH}.lock`;
 
 test("refillStatus buckets by days until due, given an explicit asOf date", () => {
   const asOf = new Date("2026-08-29T00:00:00.000Z");
@@ -96,6 +97,26 @@ test("logDose serializes concurrent calls so a race can't silently drop an updat
     const after = (await getPatient("p1")).medications.find((m) => m.id === "p1-m1").adherence.loggedDays;
     assert.equal(after, before + concurrentCalls, "every concurrent dose log must be persisted, none lost to a race");
   } finally {
+    await writeFile(PATIENTS_PATH, original, "utf-8");
+  }
+});
+
+test("logDose reclaims a stale lock orphaned by a crashed process instead of blocking forever (the real bug this fixes)", async () => {
+  const original = await readFile(PATIENTS_PATH, "utf-8");
+  // Simulate a process that acquired the lock and crashed before its
+  // `finally` cleanup ran: the lock file exists but is well past the
+  // staleness threshold.
+  await writeFile(PATIENTS_LOCK_PATH, "", "utf-8");
+  const wellPastStale = new Date(Date.now() - 10_000);
+  await utimes(PATIENTS_LOCK_PATH, wellPastStale, wellPastStale);
+  try {
+    const before = (await getPatient("p1")).medications.find((m) => m.id === "p1-m1").adherence.loggedDays;
+    const updated = await logDose("p1", "p1-m1", true);
+    assert.ok(updated, "logDose must reclaim the stale lock and succeed rather than time out");
+    const after = (await getPatient("p1")).medications.find((m) => m.id === "p1-m1").adherence.loggedDays;
+    assert.equal(after, before + 1);
+  } finally {
+    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
     await writeFile(PATIENTS_PATH, original, "utf-8");
   }
 });

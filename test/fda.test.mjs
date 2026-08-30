@@ -102,7 +102,30 @@ test("getRecentShortageUpdates sorts the demo fallback newest-first, not fixture
   assert.equal(results[0].generic_name, "Lisinopril Tablets");
 });
 
-test("searchDrugShortages matches by brand name too, not just generic name (the real bug this fixes)", async () => {
+test("searchDrugShortages matches a live record by brand name too, not just generic name (the real bug this fixes)", async () => {
+  let requestedUrl;
+  const fetchImpl = async (url) => {
+    requestedUrl = url;
+    return {
+      status: 200,
+      ok: true,
+      json: async () => ({
+        results: [
+          { generic_name: "Warfarin Sodium", status: "Current", openfda: { generic_name: ["WARFARIN SODIUM"], brand_name: ["COUMADIN"] } },
+        ],
+      }),
+    };
+  };
+  const results = await searchDrugShortages("Coumadin", { fetchImpl });
+  assert.equal(results.length, 1, "expected the live record to match via its brand name Coumadin");
+  assert.equal(results[0].source, "fda_live");
+  // The endpoint's real searchable brand field is `proprietary_name`, not
+  // `brand_name` — assert the query actually uses it (this is the query
+  // Qodo's second review caught as targeting the wrong field).
+  assert.ok(requestedUrl.includes("proprietary_name"), "query must target the endpoint's real brand field");
+});
+
+test("searchDrugShortages falls back to demo data by brand name when the live API is unreachable", async () => {
   const fetchImpl = async () => {
     throw new Error("network unreachable");
   };
@@ -111,6 +134,21 @@ test("searchDrugShortages matches by brand name too, not just generic name (the 
   const results = await searchDrugShortages("Coumadin", { fetchImpl });
   assert.ok(results.length > 0, "expected the Warfarin shortage record via its brand name Coumadin");
   assert.equal(results[0].generic_name, "Warfarin Sodium Tablets");
+});
+
+test("searchDrugShortages stays empty on a clean live no-match, never fabricating from demo data (the real bug this fixes)", async () => {
+  // A live call that *succeeds* with no active match must stay empty — it
+  // must never be "topped up" from the demo fixture, or a clean no-match
+  // for a name that happens to collide with a demo record's generic/brand
+  // name (e.g. "Coumadin") would fabricate a shortage the live FDA data
+  // never reported.
+  const fetchImpl = async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({ results: [] }),
+  });
+  const results = await searchDrugShortages("Coumadin", { fetchImpl });
+  assert.deepEqual(results, []);
 });
 
 test("isActiveRecall is true only while a recall is Ongoing, not once Terminated", () => {

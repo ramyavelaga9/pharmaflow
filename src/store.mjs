@@ -6,7 +6,7 @@
 // would swap this for a database — the file is a deliberately simple stand-in
 // for a hackathon prototype.
 
-import { readFile, writeFile, rename, open, unlink } from "node:fs/promises";
+import { readFile, writeFile, rename, open, unlink, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PATIENTS_PATH = path.join(__dirname, "..", "data", "patients.json");
 const INTERACTIONS_PATH = path.join(__dirname, "..", "data", "interactions.json");
 const PATIENTS_LOCK_PATH = `${PATIENTS_PATH}.lock`;
+// A real hold (open -> logDose's read/modify/write -> unlink) takes single-digit
+// milliseconds. Anything older than this was almost certainly orphaned by a
+// process that crashed between acquiring the lock and its `finally` cleanup.
+const STALE_LOCK_MS = 5000;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -48,7 +52,20 @@ async function savePatients(patients) {
  * patients.json) can't interleave a read-modify-write and silently drop
  * each other's update.
  */
-async function withPatientsLock(fn, { retries = 100, delayMs = 20 } = {}) {
+/** If the lock file is older than STALE_LOCK_MS, its owner almost certainly crashed before releasing it — reclaim it so writes aren't blocked indefinitely. */
+async function reclaimStaleLock() {
+  try {
+    const info = await stat(PATIENTS_LOCK_PATH);
+    if (Date.now() - info.mtimeMs > STALE_LOCK_MS) {
+      await unlink(PATIENTS_LOCK_PATH);
+    }
+  } catch {
+    // Lock disappeared or stat raced with another reclaimer between our
+    // EEXIST and here — fine, the next `open` attempt will sort it out.
+  }
+}
+
+async function withPatientsLock(fn, { retries = 150, delayMs = 50 } = {}) {
   let acquired = false;
   for (let attempt = 0; !acquired && attempt < retries; attempt++) {
     try {
@@ -57,6 +74,7 @@ async function withPatientsLock(fn, { retries = 100, delayMs = 20 } = {}) {
       acquired = true;
     } catch (err) {
       if (err.code !== "EEXIST") throw err;
+      await reclaimStaleLock();
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }

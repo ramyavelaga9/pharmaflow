@@ -122,22 +122,28 @@ async function fetchOpenFda(url, fetchImpl) {
  */
 async function searchDrugShortages(drugName, { fetchImpl = fetch } = {}) {
   // The tool schema promises "generic or brand drug name" — query and match
-  // both fields, not just generic_name, or a valid brand-name lookup
-  // (e.g. "Coumadin") can never find its generic-name record ("Warfarin").
+  // both fields, not just generic_name, or a valid brand-name lookup (e.g.
+  // "Coumadin") can never find its generic-name record ("Warfarin"). The
+  // Drug Shortages endpoint's own searchable brand field is `proprietary_name`
+  // (not `brand_name`, which only exists under the harmonized `openfda.*`
+  // block) - query both so a brand match works whichever shape a given
+  // record uses.
   const encoded = encodeURIComponent(drugName);
-  const url = `${OPENFDA_SHORTAGES_URL}?search=generic_name:"${encoded}"+OR+brand_name:"${encoded}"&limit=10`;
+  const url =
+    `${OPENFDA_SHORTAGES_URL}?search=generic_name:"${encoded}"` +
+    `+OR+proprietary_name:"${encoded}"+OR+openfda.brand_name:"${encoded}"&limit=10`;
   let records;
   try {
     records = await fetchOpenFda(url, fetchImpl);
   } catch {
+    // The live API is genuinely unreachable - fall back to the labeled demo
+    // fixture. A live call that *succeeds* with no active match must stay
+    // empty; it must never be "topped up" from demo data afterward, or a
+    // clean no-match would fabricate a shortage the live FDA data doesn't
+    // report (see this module's header contract).
     records = await loadDemoShortages();
   }
-  let active = records.filter((r) => isActiveShortage(r) && matchesShortageName(drugName, r));
-  if (!active.length) {
-    const demoRecords = await loadDemoShortages();
-    active = demoRecords.filter((r) => isActiveShortage(r) && matchesShortageName(drugName, r));
-  }
-  return active;
+  return records.filter((r) => isActiveShortage(r) && matchesShortageName(drugName, r));
 }
 
 /** Most recently updated active shortage records, regardless of drug name. */
