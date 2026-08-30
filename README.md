@@ -2,7 +2,25 @@
 
 PharmaFlow is a medication-continuity command center for care-coordination teams. It combines patient prescriptions, refill timing, interaction risk, pharmacy inventory, FDA shortages, and FDA recalls so teams can find continuity problems before they become crises.
 
-The project is built on [TrueForge](https://github.com/truefoundry/trueforge), the open-source agent harness, for the [Agent Harness Hackathon](https://www.wemakedevs.org/blogs/agent-harness-hackathon-kick-off).
+## About the project
+
+### The problem
+
+Refill timing, drug-drug interaction risk, pharmacy stock, and live FDA shortage/recall data all live in different systems that don't talk to each other. A care-coordination team has to manually cross-reference all of it, for every patient on a panel, to catch a continuity problem before it becomes one — a missed refill, an unnoticed interaction, or a slow reaction to a live FDA recall. Nothing is continuously watching all of it at once.
+
+### What PharmaFlow does
+
+PharmaFlow is an agent-backed dashboard that continuously cross-references a patient panel against prescription/refill data, a drug-interaction table, pharmacy inventory, and live openFDA shortage/recall feeds. It has three views built around one governed agent workflow:
+
+- **Drug Panel** — the panel viewed medication-first: who's on it, what's affected, and when each data source was last checked.
+- **Patient Panel** — separates what the agent already handled autonomously (a routine, in-stock reorder) from what's waiting on a person (a recall acknowledgement, a drug substitution).
+- **Mission Control / Agent Village** — an animated view of the same workflow's specialist responsibilities and the real evidence behind each one, plus a direct chat drawer into the underlying TrueForge agent.
+
+Actions are separated by consequence: a same-drug refill from available stock happens autonomously; a drug alternative, a pharmacist review, or a recall notification pauses on a real TrueForge human-approval gate until a person signs off. See [Safety and approval model](#safety-and-approval-model) below.
+
+### Why it's built this way
+
+This project was built on [TrueForge](https://github.com/truefoundry/trueforge), the open-source agent harness, for the [Agent Harness Hackathon](https://www.wemakedevs.org/blogs/agent-harness-hackathon-kick-off) — specifically to exercise TrueForge as a real execution harness rather than a chat wrapper around a model: registered MCP tools the model actually discovers and calls, git-backed procedural skills, a persistent session per case, streamed model/tool events, and gated approvals that pause and resume an exact turn. See [How TrueForge is used](#how-trueforge-is-used) for the mechanics.
 
 > **Prototype only:** PharmaFlow uses synthetic patient, pharmacy, and interaction data. It is not a clinical decision-support system and must not be used for real medication decisions.
 
@@ -110,6 +128,24 @@ No medical fact is created solely for the animation.
 | Orders | `data/orders.json` | persisted simulated actions |
 | Notifications | `data/notifications.json` | persisted simulated deliveries |
 
+## Tech stack
+
+| Layer | Technology | Why |
+| --- | --- | --- |
+| Agent harness | [TrueForge](https://github.com/truefoundry/trueforge) (`@truefoundry/trueforge-sdk`) | Registers the model, MCP servers, skills, and the `pharmaflow` agent; owns session/turn state and human-approval gating. See [How TrueForge is used](#how-trueforge-is-used). |
+| Model | OpenAI, registered through TrueForge's model-provider API | Configured in `src/setup-trueforge.mjs`; swappable via `OPENAI_API_KEY` and TrueForge settings without touching app code. |
+| Tool protocol | [Model Context Protocol](https://modelcontextprotocol.io) (`@modelcontextprotocol/sdk`) | Two purpose-built MCP servers — `src/mcp-server.mjs` (patients/cases/inventory/actions) and `src/fda-mcp-server.mjs` (FDA shortages/recalls) — expose real, typed tools over Streamable HTTP. |
+| Tool input validation | [Zod](https://zod.dev) | Validates every MCP tool's input schema before it runs. |
+| Backend | [Express](https://expressjs.com) 5, `cors`, `dotenv` | REST API for the dashboard, plus a Server-Sent Events bridge that streams TrueForge's model/tool/approval events to the browser in real time. |
+| Concurrency safety | [`proper-lockfile`](https://www.npmjs.com/package/proper-lockfile) | Cross-process lock around `patients.json`, since the REST backend and the MCP server are separate Node processes writing the same file. See [Qodo Code Review Evidence](#qodo-code-review-evidence) for how this landed here. |
+| Frontend | Vanilla HTML/CSS/JS, no framework, no build step | `web/` is served directly by Express; the Drug Panel, Patient Panel, Mission Control's Agent Village, and the Open Agent chat drawer are all hand-written DOM and SSE code. |
+| Live external data | [openFDA](https://open.fda.gov) drug-shortage and enforcement (recall) APIs | Queried live with a short timeout and a clearly labeled demo-fixture fallback (`src/fda.mjs`) — every record carries `source: "fda_live"` or `"demo"`. |
+| Persistence | JSON files under `data/` | Patients, interactions, pharmacy inventory, cases, orders, and notifications — a deliberately simple stand-in for a database in this prototype. See [Live, synthetic, and demo data](#live-synthetic-and-demo-data) above. |
+| Testing | Node's built-in test runner (`node --test`) | 88 tests, no separate test-framework dependency. See [Tests](#tests). |
+| Deployment | Docker (`node:22-alpine`) + [Render](https://render.com) (`render.yaml`) | A dashboard-only deploy image (`Dockerfile`) runs just the Express backend serving the static UI and REST API against `data/*.json` — no API keys required. It does not start TrueForge or the MCP servers, so the "Open Agent" chat drawer isn't functional in that deploy; everything else (Drug Panel, Patient Panel, cases, recalls, supply data) works. |
+| Code review | [Qodo](https://www.qodo.ai) | Automated review on every pull request. See [Qodo Code Review Evidence](#qodo-code-review-evidence) for the real findings and the multi-round fix cycle. |
+| Runtime | Node.js 22+, native ES modules (`"type": "module"`) | No transpilation step anywhere in the stack. |
+
 ## Architecture
 
 ```text
@@ -207,14 +243,15 @@ Open:
 npm test
 ```
 
-The project currently has **78 tests** using Node’s built-in test runner. Coverage includes:
+The project currently has **88 tests** using Node’s built-in test runner. Coverage includes:
 
-- refill timing and boundary conditions;
+- refill timing, calendar-boundary conditions, and look-ahead windows;
 - case creation, deduplication, reconciliation, and resolution;
 - inventory, alternatives, orders, and notification persistence;
-- openFDA shortage and recall normalization;
+- openFDA shortage and recall normalization, including brand-name matching;
 - live-API failure and explicitly labeled demo fallback;
 - interaction matching and false-positive avoidance;
+- concurrent-write serialization and the lock's compromise-abort guard;
 - TrueForge streamed tool-call accumulation and `call_tool` unwrapping;
 - tool telemetry and event-log behavior.
 
@@ -236,8 +273,11 @@ src/recalls.mjs                recall alert and acknowledgement store
 src/pharmacy-inventory.mjs     synthetic stock and approved-alternative lookup
 src/fulfillment.mjs            simulated order and notification persistence
 src/setup-trueforge.mjs        idempotent TrueForge resource registration
+src/tool-call-accumulator.mjs  streamed tool-call delta accumulation and call_tool unwrapping
 web/                           no-build dashboard UI
 test/                          node:test suites
+Dockerfile                     dashboard-only deploy image (backend + static UI, no TrueForge/MCP)
+render.yaml                    Render deploy config for the Docker image above
 ```
 
 ## TrueForge integration notes
