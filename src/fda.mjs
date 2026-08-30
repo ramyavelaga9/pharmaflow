@@ -56,6 +56,16 @@ function shortageGenericName(record) {
   return record?.openfda?.generic_name?.[0] ?? record?.generic_name ?? "";
 }
 
+function shortageBrandNames(record) {
+  return record?.openfda?.brand_name ?? [];
+}
+
+/** True if `drugName` matches a shortage record's generic OR any of its brand names. */
+function matchesShortageName(drugName, record) {
+  if (namesMatch(drugName, shortageGenericName(record))) return true;
+  return shortageBrandNames(record).some((brand) => namesMatch(drugName, brand));
+}
+
 /** A recall's `status` is "Ongoing" while active, "Terminated" once the firm has resolved it. */
 function isActiveRecall(record) {
   return String(record?.status ?? "").toLowerCase() === "ongoing";
@@ -111,17 +121,21 @@ async function fetchOpenFda(url, fetchImpl) {
  * data (that would fabricate a shortage where none exists).
  */
 async function searchDrugShortages(drugName, { fetchImpl = fetch } = {}) {
-  const url = `${OPENFDA_SHORTAGES_URL}?search=generic_name:"${encodeURIComponent(drugName)}"&limit=10`;
+  // The tool schema promises "generic or brand drug name" — query and match
+  // both fields, not just generic_name, or a valid brand-name lookup
+  // (e.g. "Coumadin") can never find its generic-name record ("Warfarin").
+  const encoded = encodeURIComponent(drugName);
+  const url = `${OPENFDA_SHORTAGES_URL}?search=generic_name:"${encoded}"+OR+brand_name:"${encoded}"&limit=10`;
   let records;
   try {
     records = await fetchOpenFda(url, fetchImpl);
   } catch {
     records = await loadDemoShortages();
   }
-  let active = records.filter((r) => isActiveShortage(r) && namesMatch(drugName, shortageGenericName(r)));
+  let active = records.filter((r) => isActiveShortage(r) && matchesShortageName(drugName, r));
   if (!active.length) {
     const demoRecords = await loadDemoShortages();
-    active = demoRecords.filter((r) => isActiveShortage(r) && namesMatch(drugName, shortageGenericName(r)));
+    active = demoRecords.filter((r) => isActiveShortage(r) && matchesShortageName(drugName, r));
   }
   return active;
 }
@@ -130,12 +144,25 @@ async function searchDrugShortages(drugName, { fetchImpl = fetch } = {}) {
 async function getRecentShortageUpdates(limit = 5, { fetchImpl = fetch } = {}) {
   const url = `${OPENFDA_SHORTAGES_URL}?sort=update_date:desc&limit=${limit}`;
   let records;
+  let usedFallback = false;
   try {
     records = await fetchOpenFda(url, fetchImpl);
   } catch {
     records = await loadDemoShortages();
+    usedFallback = true;
   }
-  return records.filter(isActiveShortage).slice(0, limit);
+  const active = records.filter(isActiveShortage);
+  if (usedFallback) {
+    // The live API sorts by update_date server-side; the demo fixture
+    // doesn't come pre-sorted, so a `limit` slice would silently return
+    // older records ahead of newer ones during an outage.
+    active.sort((a, b) => {
+      const dateA = parseShortageDate(a.update_date)?.getTime() ?? 0;
+      const dateB = parseShortageDate(b.update_date)?.getTime() ?? 0;
+      return dateB - dateA;
+    });
+  }
+  return active.slice(0, limit);
 }
 
 /**
@@ -168,6 +195,8 @@ export {
   isActiveShortage,
   isActiveRecall,
   shortageGenericName,
+  shortageBrandNames,
+  matchesShortageName,
   recallGenericName,
   parseShortageDate,
   searchDrugShortages,

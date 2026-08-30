@@ -92,6 +92,27 @@ test("getRecentShortageUpdates falls back to demo data and respects the limit", 
   assert.equal(results[0].source, "demo");
 });
 
+test("getRecentShortageUpdates sorts the demo fallback newest-first, not fixture order (the real bug this fixes)", async () => {
+  const fetchImpl = async () => {
+    throw new Error("network unreachable");
+  };
+  // The demo fixture lists Warfarin (updated 08/15/2026) before Lisinopril
+  // (updated 08/20/2026); a limit=1 slice must return the newer record.
+  const results = await getRecentShortageUpdates(1, { fetchImpl });
+  assert.equal(results[0].generic_name, "Lisinopril Tablets");
+});
+
+test("searchDrugShortages matches by brand name too, not just generic name (the real bug this fixes)", async () => {
+  const fetchImpl = async () => {
+    throw new Error("network unreachable");
+  };
+  // The demo Warfarin record only lists its brand name as "COUMADIN" — a
+  // brand-name search must still find it via openfda.brand_name.
+  const results = await searchDrugShortages("Coumadin", { fetchImpl });
+  assert.ok(results.length > 0, "expected the Warfarin shortage record via its brand name Coumadin");
+  assert.equal(results[0].generic_name, "Warfarin Sodium Tablets");
+});
+
 test("isActiveRecall is true only while a recall is Ongoing, not once Terminated", () => {
   assert.equal(isActiveRecall({ status: "Ongoing" }), true);
   assert.equal(isActiveRecall({ status: "Terminated" }), false);

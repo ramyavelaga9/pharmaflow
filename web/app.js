@@ -243,6 +243,10 @@ async function openPatient(id) {
 
   try {
     const patient = await fetchJSON(`/api/patients/${id}`);
+    // A newer selection (or a return to overview) may have happened while
+    // this fetch was in flight; render only if `id` is still the active
+    // patient, or an out-of-order response can overwrite a newer view.
+    if (state.activePatientId !== id) return;
     el("view-title").textContent = patient.name;
     el("view-subtitle").textContent = `${patient.age} years old · ${patient.conditions.join(", ")}`;
     detail.innerHTML = renderPatientDetail(patient);
@@ -250,6 +254,7 @@ async function openPatient(id) {
       btn.addEventListener("click", () => logDose(patient.id, btn.dataset.med, btn.dataset.log === "taken"));
     });
   } catch (err) {
+    if (state.activePatientId !== id) return;
     detail.innerHTML = `<p class="error-note">Couldn't load patient: ${escapeHtml(err.message)}</p>`;
   }
 }
@@ -737,6 +742,10 @@ function refreshPatientPanel() {
 }
 
 function startPatientPanelPolling() {
+  // Idempotent: re-selecting the already-active tab must not stack a second
+  // interval on top of the first (each one adding its own duplicate API
+  // traffic and DOM updates until the page is reloaded).
+  clearInterval(patientPanelPollTimer);
   refreshPatientPanel();
   patientPanelPollTimer = setInterval(refreshPatientPanel, 4000);
 }
@@ -779,6 +788,7 @@ async function loadDrugPanel() {
 let drugPanelPollTimer = null;
 
 function startDrugPanelPolling() {
+  clearInterval(drugPanelPollTimer); // idempotent: don't stack a second interval on re-selection
   loadDrugPanel();
   drugPanelPollTimer = setInterval(loadDrugPanel, 30000);
 }
@@ -1023,6 +1033,10 @@ function refreshMissionControl() {
 }
 
 function startMissionControlPolling() {
+  // Idempotent: clicking the already-selected tab repeatedly must not start
+  // additional intervals — previously only the latest timer ID was kept,
+  // so earlier ones kept running (and compounding) uncleared.
+  clearInterval(missionControlPollTimer);
   refreshMissionControl();
   missionControlPollTimer = setInterval(refreshMissionControl, 4000);
 }

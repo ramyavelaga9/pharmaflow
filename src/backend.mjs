@@ -108,8 +108,14 @@ app.get("/api/interaction-alerts", async (_req, res) => {
 });
 
 app.post("/api/patients/:id/medications/:medId/log", async (req, res) => {
+  // Require an actual JSON boolean, matching the MCP tool's z.boolean()
+  // schema — Boolean(req.body?.taken) previously let a string like "false"
+  // or a missing field silently coerce into a valid (wrong) clinical event.
+  if (typeof req.body?.taken !== "boolean") {
+    return res.status(400).json({ error: "`taken` must be a boolean" });
+  }
   try {
-    const updated = await store.logDose(req.params.id, req.params.medId, Boolean(req.body?.taken));
+    const updated = await store.logDose(req.params.id, req.params.medId, req.body.taken);
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
