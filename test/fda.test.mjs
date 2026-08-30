@@ -125,6 +125,29 @@ test("searchDrugShortages matches a live record by brand name too, not just gene
   assert.ok(requestedUrl.includes("proprietary_name"), "query must target the endpoint's real brand field");
 });
 
+test("searchDrugShortages matches a live record via proprietary_name, not just openfda.brand_name (the real bug this fixes)", async () => {
+  // The query searches `proprietary_name` (the endpoint's real top-level
+  // brand field), but a record can carry that field with no harmonized
+  // `openfda.brand_name` array at all — the local matcher must still
+  // recognize the match rather than discarding a record the query found.
+  const fetchImpl = async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({
+      results: [
+        {
+          generic_name: "Warfarin Sodium",
+          proprietary_name: "Coumadin",
+          status: "Current",
+          openfda: { generic_name: ["WARFARIN SODIUM"] },
+        },
+      ],
+    }),
+  });
+  const results = await searchDrugShortages("Coumadin", { fetchImpl });
+  assert.equal(results.length, 1, "expected the record to match via proprietary_name");
+});
+
 test("searchDrugShortages falls back to demo data by brand name when the live API is unreachable", async () => {
   const fetchImpl = async () => {
     throw new Error("network unreachable");

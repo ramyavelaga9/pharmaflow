@@ -6,7 +6,7 @@
 // would swap this for a database — the file is a deliberately simple stand-in
 // for a hackathon prototype.
 
-import { readFile, writeFile, rename, open, unlink, stat } from "node:fs/promises";
+import { readFile, writeFile, rename, open, unlink, stat, utimes } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,9 +15,13 @@ const PATIENTS_PATH = path.join(__dirname, "..", "data", "patients.json");
 const INTERACTIONS_PATH = path.join(__dirname, "..", "data", "interactions.json");
 const PATIENTS_LOCK_PATH = `${PATIENTS_PATH}.lock`;
 // A real hold (open -> logDose's read/modify/write -> unlink) takes single-digit
-// milliseconds. Anything older than this was almost certainly orphaned by a
-// process that crashed between acquiring the lock and its `finally` cleanup.
+// milliseconds. Time-since-acquisition alone can't tell a crashed owner
+// apart from one that's simply still working (e.g. a slow disk), so the
+// holder refreshes the lock's mtime on a heartbeat (see withPatientsLock)
+// well inside this window — "stale" therefore means "no heartbeat in
+// STALE_LOCK_MS", not merely "acquired a while ago".
 const STALE_LOCK_MS = 5000;
+const LOCK_HEARTBEAT_MS = Math.floor(STALE_LOCK_MS / 4);
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -52,7 +56,8 @@ async function savePatients(patients) {
  * patients.json) can't interleave a read-modify-write and silently drop
  * each other's update.
  */
-/** If the lock file is older than STALE_LOCK_MS, its owner almost certainly crashed before releasing it — reclaim it so writes aren't blocked indefinitely. */
+
+/** If the lock file's mtime hasn't been refreshed in STALE_LOCK_MS, its owner isn't sending heartbeats — almost certainly a crash, not a live-but-slow hold — so reclaim it. */
 async function reclaimStaleLock() {
   try {
     const info = await stat(PATIENTS_LOCK_PATH);
@@ -79,9 +84,18 @@ async function withPatientsLock(fn, { retries = 150, delayMs = 50 } = {}) {
     }
   }
   if (!acquired) throw new Error(`Timed out waiting for lock: ${PATIENTS_LOCK_PATH}`);
+  // Refresh the lock's mtime while we hold it, well inside STALE_LOCK_MS, so
+  // a legitimately slow (but alive) hold is never mistaken by another
+  // waiter for an orphaned one — reclaim then means "no heartbeat", not
+  // "acquired a while ago".
+  const heartbeat = setInterval(() => {
+    const now = new Date();
+    utimes(PATIENTS_LOCK_PATH, now, now).catch(() => {});
+  }, LOCK_HEARTBEAT_MS);
   try {
     return await fn();
   } finally {
+    clearInterval(heartbeat);
     await unlink(PATIENTS_LOCK_PATH).catch(() => {});
   }
 }
@@ -257,4 +271,5 @@ export {
   adherenceStats,
   summarizePanel,
   getPanelStats,
+  withPatientsLock, // exported for testing the lock's heartbeat/reclaim behavior directly
 };

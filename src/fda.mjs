@@ -60,9 +60,15 @@ function shortageBrandNames(record) {
   return record?.openfda?.brand_name ?? [];
 }
 
-/** True if `drugName` matches a shortage record's generic OR any of its brand names. */
+/** The Drug Shortages endpoint's own top-level brand field — distinct from the harmonized `openfda.brand_name` array. */
+function shortageProprietaryName(record) {
+  return record?.proprietary_name ?? "";
+}
+
+/** True if `drugName` matches a shortage record's generic name, its `proprietary_name`, or any harmonized brand name. */
 function matchesShortageName(drugName, record) {
   if (namesMatch(drugName, shortageGenericName(record))) return true;
+  if (namesMatch(drugName, shortageProprietaryName(record))) return true;
   return shortageBrandNames(record).some((brand) => namesMatch(drugName, brand));
 }
 
