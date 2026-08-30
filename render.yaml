@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: pharmaflow
+    runtime: docker
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
