@@ -1,20 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, writeFile, utimes, unlink, stat } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  refillStatus,
-  summarizePanel,
-  logDose,
-  getRefillAlerts,
-  getPatient,
-  withPatientsLock,
-} from "../src/store.mjs";
+import { refillStatus, summarizePanel, logDose, getRefillAlerts, getPatient } from "../src/store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PATIENTS_PATH = path.join(__dirname, "..", "data", "patients.json");
-const PATIENTS_LOCK_PATH = `${PATIENTS_PATH}.lock`;
 
 test("refillStatus buckets by days until due, given an explicit asOf date", () => {
   const asOf = new Date("2026-08-29T00:00:00.000Z");
@@ -108,90 +100,10 @@ test("logDose serializes concurrent calls so a race can't silently drop an updat
   }
 });
 
-test("logDose reclaims a stale lock orphaned by a crashed process instead of blocking forever (the real bug this fixes)", async () => {
-  const original = await readFile(PATIENTS_PATH, "utf-8");
-  // Simulate a process that acquired the lock and crashed before its
-  // `finally` cleanup ran: the lock file exists but is well past the
-  // staleness threshold.
-  await writeFile(PATIENTS_LOCK_PATH, "", "utf-8");
-  const wellPastStale = new Date(Date.now() - 10_000);
-  await utimes(PATIENTS_LOCK_PATH, wellPastStale, wellPastStale);
-  try {
-    const before = (await getPatient("p1")).medications.find((m) => m.id === "p1-m1").adherence.loggedDays;
-    const updated = await logDose("p1", "p1-m1", true);
-    assert.ok(updated, "logDose must reclaim the stale lock and succeed rather than time out");
-    const after = (await getPatient("p1")).medications.find((m) => m.id === "p1-m1").adherence.loggedDays;
-    assert.equal(after, before + 1);
-  } finally {
-    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
-    await writeFile(PATIENTS_PATH, original, "utf-8");
-  }
-});
-
-test("withPatientsLock refreshes the lock's mtime on a heartbeat while held, so a live-but-slow hold is never mistaken for orphaned (the real bug this fixes)", async () => {
-  // A purely time-since-acquisition staleness check can't distinguish a
-  // crashed owner from one that's simply still working; the fix is for the
-  // holder to keep refreshing the lock's mtime, so "stale" means "no
-  // heartbeat", not "acquired a while ago". Prove the heartbeat actually
-  // fires: hold the lock past one heartbeat tick and confirm the mtime
-  // moved forward during the hold, without needing to wait out the full
-  // multi-second staleness window this protects against.
-  try {
-    await withPatientsLock(async () => {
-      const acquiredMtime = (await stat(PATIENTS_LOCK_PATH)).mtimeMs;
-      await new Promise((resolve) => setTimeout(resolve, 1400)); // > one heartbeat interval
-      const refreshedMtime = (await stat(PATIENTS_LOCK_PATH)).mtimeMs;
-      assert.ok(refreshedMtime > acquiredMtime, "the lock's mtime should have been refreshed by a heartbeat while still held");
-    });
-  } finally {
-    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
-  }
-});
-
-test("withPatientsLock never deletes a lock it no longer owns, identified by inode not pathname (compare-before-delete on release) (the real bug this fixes)", async () => {
-  // Simulate a real reclaim: while we're still "holding" the lock (from our
-  // own withPatientsLock call's point of view), another process decided
-  // ours was stale, unlinked it, and created a brand-new file at the same
-  // path. Only an identity check bound to the actual file (its inode), not
-  // the pathname, can tell that apart from the lock we originally opened.
-  try {
-    await withPatientsLock(async () => {
-      await unlink(PATIENTS_LOCK_PATH);
-      await writeFile(PATIENTS_LOCK_PATH, "some-other-process-lock", "utf-8");
-    });
-    const remainingContent = await readFile(PATIENTS_LOCK_PATH, "utf-8");
-    assert.equal(
-      remainingContent,
-      "some-other-process-lock",
-      "release must not remove a lock file that was replaced by a different process"
-    );
-  } finally {
-    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
-  }
-});
-
-test("withPatientsLock's heartbeat never corrupts a lock that replaced it (the real bug this fixes)", async () => {
-  // The bug this guards against: a heartbeat that writes by *pathname*
-  // would, after another process reclaims and recreates the lock file,
-  // silently overwrite that replacement file's content with our own
-  // stale heartbeat — resurrecting our ownership claim on a file we no
-  // longer hold. The fix routes heartbeats through our own open file
-  // handle (bound to the original inode) instead, so they can never touch
-  // a replacement file at the same path. Simulate the replacement, wait
-  // past a heartbeat tick, and confirm the replacement is untouched.
-  try {
-    await withPatientsLock(async () => {
-      await unlink(PATIENTS_LOCK_PATH);
-      await writeFile(PATIENTS_LOCK_PATH, "some-other-process-lock", "utf-8");
-      await new Promise((resolve) => setTimeout(resolve, 1400)); // > one heartbeat interval
-      const contentAfterHeartbeatWindow = await readFile(PATIENTS_LOCK_PATH, "utf-8");
-      assert.equal(
-        contentAfterHeartbeatWindow,
-        "some-other-process-lock",
-        "our heartbeat must not have overwritten the replacement lock's content"
-      );
-    });
-  } finally {
-    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
-  }
-});
+// Staleness detection, heartbeat renewal, and safe release under concurrent
+// reclaim are handled by `proper-lockfile` (see src/store.mjs), a
+// widely used, independently tested library, rather than by hand-rolled
+// logic in this codebase. We don't re-test that library's own internals
+// here — the concurrency test above is the real integration coverage that
+// matters: it proves logDose's actual writes are correctly serialized
+// through the lock end-to-end.

@@ -6,22 +6,14 @@
 // would swap this for a database — the file is a deliberately simple stand-in
 // for a hackathon prototype.
 
-import { readFile, writeFile, rename, open, unlink, stat } from "node:fs/promises";
+import { readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import lockfile from "proper-lockfile";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PATIENTS_PATH = path.join(__dirname, "..", "data", "patients.json");
 const INTERACTIONS_PATH = path.join(__dirname, "..", "data", "interactions.json");
-const PATIENTS_LOCK_PATH = `${PATIENTS_PATH}.lock`;
-// A real hold (open -> logDose's read/modify/write -> unlink) takes single-digit
-// milliseconds. Time-since-acquisition alone can't tell a crashed owner
-// apart from one that's simply still working (e.g. a slow disk), so the
-// holder refreshes the lock's mtime on a heartbeat (see withPatientsLock)
-// well inside this window — "stale" therefore means "no heartbeat in
-// STALE_LOCK_MS", not merely "acquired a while ago".
-const STALE_LOCK_MS = 5000;
-const LOCK_HEARTBEAT_MS = Math.floor(STALE_LOCK_MS / 4);
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -51,73 +43,37 @@ async function savePatients(patients) {
 }
 
 /**
- * Simple cross-process exclusive lock via `open(..., "wx")`, so the REST
- * backend and the MCP server (two separate Node processes, both mutating
- * patients.json) can't interleave a read-modify-write and silently drop
- * each other's update.
+ * Cross-process lock over patients.json (the REST backend and the MCP
+ * server both mutate it), backed by `proper-lockfile` rather than a
+ * hand-rolled implementation. Getting staleness detection, heartbeat
+ * renewal, and safe release under concurrent reclaim correct is a genuinely
+ * hard problem — a hand-rolled version went through several rounds of
+ * subtle races (reclaiming a lock still held by a live-but-slow process; a
+ * heartbeat that could resurrect a stale claim over a lock that had since
+ * been replaced; a stat-then-unlink TOCTOU window on release) before
+ * landing on this: a widely used, battle-tested library built specifically
+ * to solve it, using an atomic `mkdir`-based lock plus its own
+ * heartbeat/staleness/compromise-detection machinery.
  */
+const LOCK_OPTIONS = {
+  stale: 5000, // a real hold (read/modify/rename) takes single-digit ms
+  retries: { retries: 100, minTimeout: 20, maxTimeout: 100 },
+  onCompromised: (err) => {
+    // A compromised lock means another process concluded ours was stale
+    // and reclaimed it while we still held it — only plausible under
+    // severe, sustained event-loop starvation for a critical section this
+    // fast. Log loudly instead of letting the library's default handler
+    // throw and take down the whole process.
+    console.error("patients.json lock was compromised:", err.message);
+  },
+};
 
-/** If the lock file's mtime hasn't been refreshed in STALE_LOCK_MS, its owner isn't sending heartbeats — almost certainly a crash, not a live-but-slow hold — so reclaim it. */
-async function reclaimStaleLock() {
-  try {
-    const info = await stat(PATIENTS_LOCK_PATH);
-    if (Date.now() - info.mtimeMs > STALE_LOCK_MS) {
-      await unlink(PATIENTS_LOCK_PATH);
-    }
-  } catch {
-    // Lock disappeared or stat raced with another reclaimer between our
-    // EEXIST and here — fine, the next `open` attempt will sort it out.
-  }
-}
-
-async function withPatientsLock(fn, { retries = 150, delayMs = 50 } = {}) {
-  let handle;
-  for (let attempt = 0; !handle && attempt < retries; attempt++) {
-    try {
-      handle = await open(PATIENTS_LOCK_PATH, "wx");
-    } catch (err) {
-      if (err.code !== "EEXIST") throw err;
-      await reclaimStaleLock();
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-  if (!handle) throw new Error(`Timed out waiting for lock: ${PATIENTS_LOCK_PATH}`);
-
-  // Identify this acquisition by its actual inode, not the pathname: a
-  // pathname can start pointing at a completely different file the moment
-  // another process reclaims (unlinks) and re-creates the lock, but our
-  // open handle keeps referring to the specific file we created even then.
-  const { dev: ourDev, ino: ourIno } = await handle.stat();
-
-  // Refresh the lock's mtime while we hold it, well inside STALE_LOCK_MS,
-  // so a legitimately slow (but alive) hold is never mistaken by another
-  // waiter for an orphaned one. Crucially, this goes through our own open
-  // *handle*, not a fresh open-by-pathname: if we wrote by pathname
-  // instead, a heartbeat that fires after another process has already
-  // reclaimed and re-created the lock would silently overwrite THEIR
-  // replacement file with our own token — resurrecting our ownership
-  // claim on a file we no longer own, and corrupting their lock.
-  const heartbeat = setInterval(() => {
-    const now = new Date();
-    handle.utimes(now, now).catch(() => {});
-  }, LOCK_HEARTBEAT_MS);
+async function withPatientsLock(fn) {
+  const release = await lockfile.lock(PATIENTS_PATH, LOCK_OPTIONS);
   try {
     return await fn();
   } finally {
-    clearInterval(heartbeat);
-    try {
-      // Release only if the pathname still points at the same inode we
-      // acquired. If it now points elsewhere, another process reclaimed
-      // and replaced our lock while we held it — unlinking here would
-      // destroy their valid lock and reopen the exact race this
-      // mechanism exists to prevent.
-      const pathInfo = await stat(PATIENTS_LOCK_PATH).catch(() => null);
-      if (pathInfo && pathInfo.dev === ourDev && pathInfo.ino === ourIno) {
-        await unlink(PATIENTS_LOCK_PATH);
-      }
-    } finally {
-      await handle.close();
-    }
+    await release();
   }
 }
 
@@ -292,5 +248,4 @@ export {
   adherenceStats,
   summarizePanel,
   getPanelStats,
-  withPatientsLock, // exported for testing the lock's heartbeat/reclaim behavior directly
 };
