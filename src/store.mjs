@@ -6,9 +6,10 @@
 // would swap this for a database — the file is a deliberately simple stand-in
 // for a hackathon prototype.
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import lockfile from "proper-lockfile";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PATIENTS_PATH = path.join(__dirname, "..", "data", "patients.json");
@@ -20,6 +21,11 @@ function today() {
   return new Date();
 }
 
+/** Midnight UTC for the same calendar date as `date`, discarding its time-of-day. */
+function toUTCDateOnly(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
 function daysBetween(a, b) {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);
 }
@@ -29,8 +35,84 @@ async function loadPatients() {
   return JSON.parse(raw);
 }
 
+/** Atomic write (write to a temp file, then rename) so a reader never sees a partially written file. */
 async function savePatients(patients) {
-  await writeFile(PATIENTS_PATH, JSON.stringify(patients, null, 2) + "\n", "utf-8");
+  const tmpPath = `${PATIENTS_PATH}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmpPath, JSON.stringify(patients, null, 2) + "\n", "utf-8");
+  await rename(tmpPath, PATIENTS_PATH);
+}
+
+/**
+ * Cross-process lock over patients.json (the REST backend and the MCP
+ * server both mutate it), backed by `proper-lockfile` rather than a
+ * hand-rolled implementation. Getting staleness detection, heartbeat
+ * renewal, and safe release under concurrent reclaim correct is a genuinely
+ * hard problem — a hand-rolled version went through several rounds of
+ * subtle races (reclaiming a lock still held by a live-but-slow process; a
+ * heartbeat that could resurrect a stale claim over a lock that had since
+ * been replaced; a stat-then-unlink TOCTOU window on release) before
+ * landing on this: a widely used, battle-tested library built specifically
+ * to solve it, using an atomic `mkdir`-based lock plus its own
+ * heartbeat/staleness/compromise-detection machinery.
+ */
+const LOCK_OPTIONS = {
+  stale: 5000, // a real hold (read/modify/rename) takes single-digit ms
+  retries: { retries: 100, minTimeout: 20, maxTimeout: 100 },
+};
+
+/**
+ * Tracks whether the lock we're holding has been reported compromised
+ * (mutual exclusion may no longer be guaranteed), so an in-flight critical
+ * section can check `assertNotCompromised()` immediately before its write
+ * and abort instead of continuing to `savePatients` unsafely. Kept as a
+ * small, standalone, synchronous piece so it's testable without needing to
+ * exercise `proper-lockfile`'s own real staleness timing.
+ */
+function createCompromiseGuard() {
+  let compromisedError = null;
+  return {
+    markCompromised(err) {
+      compromisedError = err;
+    },
+    assertNotCompromised() {
+      if (compromisedError) {
+        throw Object.assign(
+          new Error(`Lock compromised, refusing to write: ${compromisedError.message}`),
+          { code: "ELOCKCOMPROMISED" }
+        );
+      }
+    },
+  };
+}
+
+async function withPatientsLock(fn) {
+  const guard = createCompromiseGuard();
+  const release = await lockfile.lock(PATIENTS_PATH, {
+    ...LOCK_OPTIONS,
+    onCompromised: (err) => {
+      // Mark it so the in-flight fn() can refuse to write, rather than
+      // just logging and letting it continue (that would leave the write
+      // racing a new owner) or letting the library's default handler
+      // `throw` from its internal timer, which has nothing to catch it
+      // and would crash the whole process over an edge case this
+      // fast-and-usually-uncontended critical section should almost never
+      // hit.
+      guard.markCompromised(err);
+      console.error("patients.json lock was compromised:", err.message);
+    },
+  });
+  try {
+    return await fn(guard.assertNotCompromised);
+  } finally {
+    try {
+      await release();
+    } catch (err) {
+      // A prior compromise already released the lock on our behalf -
+      // nothing more to release. Any other release failure is real and
+      // should surface.
+      if (err.code !== "ERELEASED") throw err;
+    }
+  }
 }
 
 async function loadInteractions() {
@@ -42,7 +124,12 @@ async function loadInteractions() {
 function refillStatus(med, asOf = today()) {
   const filled = new Date(med.lastFilled);
   const dueDate = new Date(filled.getTime() + med.daysSupply * MS_PER_DAY);
-  const daysUntilDue = daysBetween(asOf, dueDate);
+  // Compare calendar dates, not timestamps: `asOf` defaults to the real
+  // current moment (including time-of-day), but `dueDate` is always
+  // midnight UTC. Without normalizing `asOf` to midnight too, a medication
+  // due "today" silently flips from critical to overdue once the clock
+  // passes noon UTC, purely from Math.round()'s fractional-day rounding.
+  const daysUntilDue = daysBetween(toUTCDateOnly(asOf), dueDate);
   let status = "ok";
   if (daysUntilDue < 0) status = "overdue";
   else if (daysUntilDue <= 2) status = "critical";
@@ -131,13 +218,18 @@ async function getPatient(patientId, asOf = today()) {
   return { ...enriched, interactions };
 }
 
-async function getRefillAlerts(daysAhead = 7, asOf = today()) {
-  const patients = await loadPatients();
+async function getRefillAlerts(daysAhead = 7, asOf = today(), { patients: patientsOverride } = {}) {
+  const patients = patientsOverride ?? (await loadPatients());
   const alerts = [];
   for (const p of patients) {
     for (const m of p.medications) {
       const r = refillStatus(m, asOf);
-      if (r.status !== "ok" && r.daysUntilDue <= daysAhead) {
+      // Select purely on the requested window, not on the display status:
+      // `status` only becomes non-"ok" within 7 days, so a 14-day look-ahead
+      // was silently dropping everything due 8-14 days out. Overdue items
+      // (negative daysUntilDue) are always <= a non-negative daysAhead, so
+      // they stay included too.
+      if (r.daysUntilDue <= daysAhead) {
         alerts.push({
           patientId: p.id,
           patientName: p.name,
@@ -165,15 +257,25 @@ async function getAllInteractionAlerts() {
 }
 
 async function logDose(patientId, medicationId, taken) {
-  const patients = await loadPatients();
-  const patient = patients.find((p) => p.id === patientId);
-  if (!patient) throw new Error(`Unknown patient: ${patientId}`);
-  const med = patient.medications.find((m) => m.id === medicationId);
-  if (!med) throw new Error(`Unknown medication: ${medicationId}`);
-  med.adherenceLog = med.adherenceLog ?? [];
-  med.adherenceLog.push(Boolean(taken));
-  await savePatients(patients);
-  return { ...med, refill: refillStatus(med), adherence: adherenceStats(med) };
+  // logDose is a read-modify-write over the whole patients file, and both
+  // the REST backend and the MCP server call it — concurrent calls (even
+  // across processes) can race and silently drop one caller's dose log
+  // without the lock below.
+  return withPatientsLock(async (assertNotCompromised) => {
+    const patients = await loadPatients();
+    const patient = patients.find((p) => p.id === patientId);
+    if (!patient) throw new Error(`Unknown patient: ${patientId}`);
+    const med = patient.medications.find((m) => m.id === medicationId);
+    if (!med) throw new Error(`Unknown medication: ${medicationId}`);
+    med.adherenceLog = med.adherenceLog ?? [];
+    med.adherenceLog.push(Boolean(taken));
+    // Last checkpoint before the write that must be exclusive: if the lock
+    // was reported compromised while we were working, refuse to write
+    // rather than risk racing whichever process reclaimed it.
+    assertNotCompromised();
+    await savePatients(patients);
+    return { ...med, refill: refillStatus(med), adherence: adherenceStats(med) };
+  });
 }
 
 export {
@@ -188,4 +290,5 @@ export {
   adherenceStats,
   summarizePanel,
   getPanelStats,
+  createCompromiseGuard, // exported for testing the compromise-abort guard directly
 };

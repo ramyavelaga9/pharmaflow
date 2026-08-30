@@ -162,14 +162,21 @@ async function upsertSkills() {
 }
 
 async function upsertAgent(skillsRegistered) {
+  const { data: existing } = await call("GET", "/api/v1/agents");
+  const found = existing.find((a) => a.name === AGENT_NAME);
+
+  // If this run skipped skill registration (no PHARMAFLOW_SKILL_REPO_URL),
+  // omitting `skills` from the manifest would PUT it over the existing
+  // agent and strip any skills a previous run had already attached. Fall
+  // back to whatever skills that agent already has instead of dropping them.
+  const skills = skillsRegistered ? SKILLS.map(({ name }) => ({ name })) : found?.manifest?.skills;
+
   const manifest = {
     model: { name: MODEL_NAME },
     instructions: AGENT_INSTRUCTIONS,
     mcp_servers: AGENT_MCP_SERVERS,
-    ...(skillsRegistered ? { skills: SKILLS.map(({ name }) => ({ name })) } : {}),
+    ...(skills ? { skills } : {}),
   };
-  const { data: existing } = await call("GET", "/api/v1/agents");
-  const found = existing.find((a) => a.name === AGENT_NAME);
   if (found) {
     await call("PUT", `/api/v1/agents/${found.id}`, { manifest });
     console.log(`✓ updated agent: ${AGENT_NAME}`);
