@@ -257,4 +257,14 @@ Two runtime details were validated against the live harness:
 
 ## Qodo Code Review Evidence
 
-_To be completed after review on [app.qodo.ai](https://app.qodo.ai)._
+Qodo is connected to this GitHub repo and reviews every pull request automatically.
+
+- **[PR #1 — initial feature PR](https://github.com/ramyavelaga9/pharmaflow/pull/1):** Qodo flagged [9 real bugs](https://github.com/ramyavelaga9/pharmaflow/pull/1#issuecomment-5464387784) (6 high, 3 medium) — a refill look-ahead window that silently dropped medications due 8–14 days out, an unsynchronized concurrent write that could drop a dose log, a UTC-midnight boundary bug that flipped refill urgency mid-day, misordered FDA fallback data, a duplicate-polling-interval leak in Mission Control, a REST endpoint that coerced malformed dose values instead of rejecting them, a brand-name drug search that could never match, a setup script that stripped previously registered skills on rerun, and a UI race that could render a stale patient onto a newer selection. The PR merged with these unresolved.
+- **[PR #4 — fix + review PR](https://github.com/ramyavelaga9/pharmaflow/pull/4):** fixed all 9 findings above and re-ran Qodo review after every commit, since each fix pass itself surfaced further, genuinely valid issues (all in the newly added `patients.json` cross-process lock, the hardest piece of this fix set):
+  1. Fixed the original 9 findings → Qodo's re-review found **4 new issues** in the fix itself (a live-only URL that queried the wrong openFDA field, a broadened brand-match that could fabricate a shortage on a clean live no-match, no crash-recovery for an orphaned lock file, and a same-patient race the first stale-response fix missed).
+  2. Fixed those 4 → Qodo found **2 more** (the stale-lock reclaim could steal a lock still held by a live-but-slow process; a live record matched by `proprietary_name` was being filtered back out).
+  3. Fixed those 2 → Qodo found **1 more**, a real TOCTOU-class defect (a heartbeat writing by pathname could resurrect ownership over a lock another process had already reclaimed and replaced).
+  4. Rather than patch that a fifth time, replaced the hand-rolled lock with [`proper-lockfile`](https://www.npmjs.com/package/proper-lockfile), a mature, independently tested library built to solve exactly this class of problem → Qodo found **1 more** (a custom `onCompromised` handler logged and continued instead of stopping the in-flight write).
+  5. Added an explicit abort checkpoint immediately before the write → **Qodo reported 0 bugs.**
+
+  Every round added regression tests for the fix it introduced; the suite grew from 78 to 88 tests, all passing. The commit history on PR #4 is the full, real review-and-fix loop, including the two intermediate escalations (adding a crash-recovery heartbeat, then switching to a proven library) that a purely reactive, single-pass fix would have missed.
