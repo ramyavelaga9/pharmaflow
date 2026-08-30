@@ -6,7 +6,8 @@
 // would swap this for a database — the file is a deliberately simple stand-in
 // for a hackathon prototype.
 
-import { readFile, writeFile, rename, open, unlink, stat, utimes } from "node:fs/promises";
+import { readFile, writeFile, rename, open, unlink, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -71,10 +72,17 @@ async function reclaimStaleLock() {
 }
 
 async function withPatientsLock(fn, { retries = 150, delayMs = 50 } = {}) {
+  // A token identifying *this* acquisition, not just this process — so a
+  // release can tell "the lock I originally acquired" apart from "a lock
+  // that currently exists" (which might belong to a different owner that
+  // reclaimed and re-acquired after mine went stale).
+  const ownerToken = `${process.pid}:${randomUUID()}`;
+
   let acquired = false;
   for (let attempt = 0; !acquired && attempt < retries; attempt++) {
     try {
       const handle = await open(PATIENTS_LOCK_PATH, "wx");
+      await handle.writeFile(ownerToken, "utf-8");
       await handle.close();
       acquired = true;
     } catch (err) {
@@ -84,19 +92,30 @@ async function withPatientsLock(fn, { retries = 150, delayMs = 50 } = {}) {
     }
   }
   if (!acquired) throw new Error(`Timed out waiting for lock: ${PATIENTS_LOCK_PATH}`);
-  // Refresh the lock's mtime while we hold it, well inside STALE_LOCK_MS, so
-  // a legitimately slow (but alive) hold is never mistaken by another
-  // waiter for an orphaned one — reclaim then means "no heartbeat", not
-  // "acquired a while ago".
+
+  // Refresh the lock's content/mtime while we hold it, well inside
+  // STALE_LOCK_MS, so a legitimately slow (but alive) hold is never
+  // mistaken by another waiter for an orphaned one — reclaim then means
+  // "no heartbeat", not "acquired a while ago".
   const heartbeat = setInterval(() => {
-    const now = new Date();
-    utimes(PATIENTS_LOCK_PATH, now, now).catch(() => {});
+    writeFile(PATIENTS_LOCK_PATH, ownerToken, "utf-8").catch(() => {});
   }, LOCK_HEARTBEAT_MS);
   try {
     return await fn();
   } finally {
     clearInterval(heartbeat);
-    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
+    // Release only if the lock still identifies us as its owner. If our
+    // heartbeat was ever delayed past STALE_LOCK_MS (event-loop
+    // congestion, a GC pause), another waiter may have already reclaimed
+    // this lock and re-acquired it under its own token — deleting it here
+    // would destroy THEIR valid lock and reopen the exact race this
+    // mechanism exists to prevent.
+    try {
+      const currentOwner = await readFile(PATIENTS_LOCK_PATH, "utf-8");
+      if (currentOwner === ownerToken) await unlink(PATIENTS_LOCK_PATH);
+    } catch {
+      // Already gone, or unreadable — nothing more we can safely do.
+    }
   }
 }
 

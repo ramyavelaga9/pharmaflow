@@ -147,3 +147,25 @@ test("withPatientsLock refreshes the lock's mtime on a heartbeat while held, so 
     await unlink(PATIENTS_LOCK_PATH).catch(() => {});
   }
 });
+
+test("withPatientsLock never deletes a lock it no longer owns (compare-before-delete on release) (the real bug this fixes)", async () => {
+  // Simulate the scenario the owner token guards against: while we're
+  // still "holding" the lock (from our own withPatientsLock call's point
+  // of view), some other process has already decided ours was stale,
+  // reclaimed it, and re-acquired it under a different owner token. Our
+  // own release must recognize the lock content no longer matches what we
+  // wrote and must NOT delete it out from under that new owner.
+  try {
+    await withPatientsLock(async () => {
+      await writeFile(PATIENTS_LOCK_PATH, "some-other-process:some-other-token", "utf-8");
+    });
+    const remainingOwner = await readFile(PATIENTS_LOCK_PATH, "utf-8");
+    assert.equal(
+      remainingOwner,
+      "some-other-process:some-other-token",
+      "release must not remove a lock that now identifies a different owner"
+    );
+  } finally {
+    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
+  }
+});
