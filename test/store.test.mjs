@@ -148,23 +148,49 @@ test("withPatientsLock refreshes the lock's mtime on a heartbeat while held, so 
   }
 });
 
-test("withPatientsLock never deletes a lock it no longer owns (compare-before-delete on release) (the real bug this fixes)", async () => {
-  // Simulate the scenario the owner token guards against: while we're
-  // still "holding" the lock (from our own withPatientsLock call's point
-  // of view), some other process has already decided ours was stale,
-  // reclaimed it, and re-acquired it under a different owner token. Our
-  // own release must recognize the lock content no longer matches what we
-  // wrote and must NOT delete it out from under that new owner.
+test("withPatientsLock never deletes a lock it no longer owns, identified by inode not pathname (compare-before-delete on release) (the real bug this fixes)", async () => {
+  // Simulate a real reclaim: while we're still "holding" the lock (from our
+  // own withPatientsLock call's point of view), another process decided
+  // ours was stale, unlinked it, and created a brand-new file at the same
+  // path. Only an identity check bound to the actual file (its inode), not
+  // the pathname, can tell that apart from the lock we originally opened.
   try {
     await withPatientsLock(async () => {
-      await writeFile(PATIENTS_LOCK_PATH, "some-other-process:some-other-token", "utf-8");
+      await unlink(PATIENTS_LOCK_PATH);
+      await writeFile(PATIENTS_LOCK_PATH, "some-other-process-lock", "utf-8");
     });
-    const remainingOwner = await readFile(PATIENTS_LOCK_PATH, "utf-8");
+    const remainingContent = await readFile(PATIENTS_LOCK_PATH, "utf-8");
     assert.equal(
-      remainingOwner,
-      "some-other-process:some-other-token",
-      "release must not remove a lock that now identifies a different owner"
+      remainingContent,
+      "some-other-process-lock",
+      "release must not remove a lock file that was replaced by a different process"
     );
+  } finally {
+    await unlink(PATIENTS_LOCK_PATH).catch(() => {});
+  }
+});
+
+test("withPatientsLock's heartbeat never corrupts a lock that replaced it (the real bug this fixes)", async () => {
+  // The bug this guards against: a heartbeat that writes by *pathname*
+  // would, after another process reclaims and recreates the lock file,
+  // silently overwrite that replacement file's content with our own
+  // stale heartbeat — resurrecting our ownership claim on a file we no
+  // longer hold. The fix routes heartbeats through our own open file
+  // handle (bound to the original inode) instead, so they can never touch
+  // a replacement file at the same path. Simulate the replacement, wait
+  // past a heartbeat tick, and confirm the replacement is untouched.
+  try {
+    await withPatientsLock(async () => {
+      await unlink(PATIENTS_LOCK_PATH);
+      await writeFile(PATIENTS_LOCK_PATH, "some-other-process-lock", "utf-8");
+      await new Promise((resolve) => setTimeout(resolve, 1400)); // > one heartbeat interval
+      const contentAfterHeartbeatWindow = await readFile(PATIENTS_LOCK_PATH, "utf-8");
+      assert.equal(
+        contentAfterHeartbeatWindow,
+        "some-other-process-lock",
+        "our heartbeat must not have overwritten the replacement lock's content"
+      );
+    });
   } finally {
     await unlink(PATIENTS_LOCK_PATH).catch(() => {});
   }

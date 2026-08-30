@@ -7,7 +7,6 @@
 // for a hackathon prototype.
 
 import { readFile, writeFile, rename, open, unlink, stat } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,49 +71,52 @@ async function reclaimStaleLock() {
 }
 
 async function withPatientsLock(fn, { retries = 150, delayMs = 50 } = {}) {
-  // A token identifying *this* acquisition, not just this process — so a
-  // release can tell "the lock I originally acquired" apart from "a lock
-  // that currently exists" (which might belong to a different owner that
-  // reclaimed and re-acquired after mine went stale).
-  const ownerToken = `${process.pid}:${randomUUID()}`;
-
-  let acquired = false;
-  for (let attempt = 0; !acquired && attempt < retries; attempt++) {
+  let handle;
+  for (let attempt = 0; !handle && attempt < retries; attempt++) {
     try {
-      const handle = await open(PATIENTS_LOCK_PATH, "wx");
-      await handle.writeFile(ownerToken, "utf-8");
-      await handle.close();
-      acquired = true;
+      handle = await open(PATIENTS_LOCK_PATH, "wx");
     } catch (err) {
       if (err.code !== "EEXIST") throw err;
       await reclaimStaleLock();
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
-  if (!acquired) throw new Error(`Timed out waiting for lock: ${PATIENTS_LOCK_PATH}`);
+  if (!handle) throw new Error(`Timed out waiting for lock: ${PATIENTS_LOCK_PATH}`);
 
-  // Refresh the lock's content/mtime while we hold it, well inside
-  // STALE_LOCK_MS, so a legitimately slow (but alive) hold is never
-  // mistaken by another waiter for an orphaned one — reclaim then means
-  // "no heartbeat", not "acquired a while ago".
+  // Identify this acquisition by its actual inode, not the pathname: a
+  // pathname can start pointing at a completely different file the moment
+  // another process reclaims (unlinks) and re-creates the lock, but our
+  // open handle keeps referring to the specific file we created even then.
+  const { dev: ourDev, ino: ourIno } = await handle.stat();
+
+  // Refresh the lock's mtime while we hold it, well inside STALE_LOCK_MS,
+  // so a legitimately slow (but alive) hold is never mistaken by another
+  // waiter for an orphaned one. Crucially, this goes through our own open
+  // *handle*, not a fresh open-by-pathname: if we wrote by pathname
+  // instead, a heartbeat that fires after another process has already
+  // reclaimed and re-created the lock would silently overwrite THEIR
+  // replacement file with our own token — resurrecting our ownership
+  // claim on a file we no longer own, and corrupting their lock.
   const heartbeat = setInterval(() => {
-    writeFile(PATIENTS_LOCK_PATH, ownerToken, "utf-8").catch(() => {});
+    const now = new Date();
+    handle.utimes(now, now).catch(() => {});
   }, LOCK_HEARTBEAT_MS);
   try {
     return await fn();
   } finally {
     clearInterval(heartbeat);
-    // Release only if the lock still identifies us as its owner. If our
-    // heartbeat was ever delayed past STALE_LOCK_MS (event-loop
-    // congestion, a GC pause), another waiter may have already reclaimed
-    // this lock and re-acquired it under its own token — deleting it here
-    // would destroy THEIR valid lock and reopen the exact race this
-    // mechanism exists to prevent.
     try {
-      const currentOwner = await readFile(PATIENTS_LOCK_PATH, "utf-8");
-      if (currentOwner === ownerToken) await unlink(PATIENTS_LOCK_PATH);
-    } catch {
-      // Already gone, or unreadable — nothing more we can safely do.
+      // Release only if the pathname still points at the same inode we
+      // acquired. If it now points elsewhere, another process reclaimed
+      // and replaced our lock while we held it — unlinking here would
+      // destroy their valid lock and reopen the exact race this
+      // mechanism exists to prevent.
+      const pathInfo = await stat(PATIENTS_LOCK_PATH).catch(() => null);
+      if (pathInfo && pathInfo.dev === ourDev && pathInfo.ino === ourIno) {
+        await unlink(PATIENTS_LOCK_PATH);
+      }
+    } finally {
+      await handle.close();
     }
   }
 }
