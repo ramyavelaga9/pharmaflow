@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { refillStatus, summarizePanel, logDose, getRefillAlerts, getPatient } from "../src/store.mjs";
+import {
+  refillStatus,
+  summarizePanel,
+  logDose,
+  getRefillAlerts,
+  getPatient,
+  createCompromiseGuard,
+} from "../src/store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PATIENTS_PATH = path.join(__dirname, "..", "data", "patients.json");
@@ -107,3 +114,20 @@ test("logDose serializes concurrent calls so a race can't silently drop an updat
 // here — the concurrency test above is the real integration coverage that
 // matters: it proves logDose's actual writes are correctly serialized
 // through the lock end-to-end.
+
+test("createCompromiseGuard lets a write proceed while the lock has not been reported compromised", () => {
+  const guard = createCompromiseGuard();
+  assert.doesNotThrow(() => guard.assertNotCompromised());
+});
+
+test("createCompromiseGuard refuses a write once the lock has been reported compromised (the real bug this fixes)", () => {
+  // The bug this guards against: logging-and-continuing on a compromised
+  // lock (an earlier version of this fix) let the in-flight write proceed
+  // even though mutual exclusion was no longer guaranteed, risking a race
+  // with whichever process reclaimed the lock. assertNotCompromised is the
+  // checkpoint logDose calls immediately before savePatients to prevent
+  // exactly that.
+  const guard = createCompromiseGuard();
+  guard.markCompromised(new Error("mtime mismatch"));
+  assert.throws(() => guard.assertNotCompromised(), { code: "ELOCKCOMPROMISED" });
+});

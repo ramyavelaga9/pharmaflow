@@ -58,22 +58,60 @@ async function savePatients(patients) {
 const LOCK_OPTIONS = {
   stale: 5000, // a real hold (read/modify/rename) takes single-digit ms
   retries: { retries: 100, minTimeout: 20, maxTimeout: 100 },
-  onCompromised: (err) => {
-    // A compromised lock means another process concluded ours was stale
-    // and reclaimed it while we still held it — only plausible under
-    // severe, sustained event-loop starvation for a critical section this
-    // fast. Log loudly instead of letting the library's default handler
-    // throw and take down the whole process.
-    console.error("patients.json lock was compromised:", err.message);
-  },
 };
 
+/**
+ * Tracks whether the lock we're holding has been reported compromised
+ * (mutual exclusion may no longer be guaranteed), so an in-flight critical
+ * section can check `assertNotCompromised()` immediately before its write
+ * and abort instead of continuing to `savePatients` unsafely. Kept as a
+ * small, standalone, synchronous piece so it's testable without needing to
+ * exercise `proper-lockfile`'s own real staleness timing.
+ */
+function createCompromiseGuard() {
+  let compromisedError = null;
+  return {
+    markCompromised(err) {
+      compromisedError = err;
+    },
+    assertNotCompromised() {
+      if (compromisedError) {
+        throw Object.assign(
+          new Error(`Lock compromised, refusing to write: ${compromisedError.message}`),
+          { code: "ELOCKCOMPROMISED" }
+        );
+      }
+    },
+  };
+}
+
 async function withPatientsLock(fn) {
-  const release = await lockfile.lock(PATIENTS_PATH, LOCK_OPTIONS);
+  const guard = createCompromiseGuard();
+  const release = await lockfile.lock(PATIENTS_PATH, {
+    ...LOCK_OPTIONS,
+    onCompromised: (err) => {
+      // Mark it so the in-flight fn() can refuse to write, rather than
+      // just logging and letting it continue (that would leave the write
+      // racing a new owner) or letting the library's default handler
+      // `throw` from its internal timer, which has nothing to catch it
+      // and would crash the whole process over an edge case this
+      // fast-and-usually-uncontended critical section should almost never
+      // hit.
+      guard.markCompromised(err);
+      console.error("patients.json lock was compromised:", err.message);
+    },
+  });
   try {
-    return await fn();
+    return await fn(guard.assertNotCompromised);
   } finally {
-    await release();
+    try {
+      await release();
+    } catch (err) {
+      // A prior compromise already released the lock on our behalf -
+      // nothing more to release. Any other release failure is real and
+      // should surface.
+      if (err.code !== "ERELEASED") throw err;
+    }
   }
 }
 
@@ -223,7 +261,7 @@ async function logDose(patientId, medicationId, taken) {
   // the REST backend and the MCP server call it — concurrent calls (even
   // across processes) can race and silently drop one caller's dose log
   // without the lock below.
-  return withPatientsLock(async () => {
+  return withPatientsLock(async (assertNotCompromised) => {
     const patients = await loadPatients();
     const patient = patients.find((p) => p.id === patientId);
     if (!patient) throw new Error(`Unknown patient: ${patientId}`);
@@ -231,6 +269,10 @@ async function logDose(patientId, medicationId, taken) {
     if (!med) throw new Error(`Unknown medication: ${medicationId}`);
     med.adherenceLog = med.adherenceLog ?? [];
     med.adherenceLog.push(Boolean(taken));
+    // Last checkpoint before the write that must be exclusive: if the lock
+    // was reported compromised while we were working, refuse to write
+    // rather than risk racing whichever process reclaimed it.
+    assertNotCompromised();
     await savePatients(patients);
     return { ...med, refill: refillStatus(med), adherence: adherenceStats(med) };
   });
@@ -248,4 +290,5 @@ export {
   adherenceStats,
   summarizePanel,
   getPanelStats,
+  createCompromiseGuard, // exported for testing the compromise-abort guard directly
 };
