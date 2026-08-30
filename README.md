@@ -12,19 +12,19 @@ The project is built on [TrueForge](https://github.com/truefoundry/trueforge), t
 
 The default command-center view groups the patient panel by medication. It shows who takes each drug, active shortage and recall signals, affected patients, and when FDA, prescription, and pharmacy-inventory sources were last checked.
 
-![PharmaFlow Drug Panel](docs/screenshots/drug-panel.jpg)
+![PharmaFlow Drug Panel](docs/screenshots/drug-panel.png)
 
 ### Patient Panel
 
 The Patient Panel separates work requiring pharmacist approval from actions the agent can safely complete autonomously. Recall alerts can block renewal and prompt a patient notification; in-stock continuity cases can produce a routine same-drug reorder.
 
-![PharmaFlow Patient Panel](docs/screenshots/patient-panel.jpg)
+![PharmaFlow Patient Panel](docs/screenshots/patient-panel.png)
 
 ### Mission Control — Agent Village
 
 Mission Control turns the workflow into an animated, Minecraft-inspired operations map. Specialist roles carry labeled evidence to the orchestration palace, while workflow achievements summarize cases cleared, live evidence verified, inventory checks completed, and notifications sent.
 
-![PharmaFlow Mission Control Agent Village](docs/screenshots/mission-control.jpg)
+![PharmaFlow Mission Control Agent Village](docs/screenshots/mission-control.png)
 
 The map is interactive: select an agent to inspect its purpose and current task, pause the animation, or change its speed. Movement is driven by workflow evidence; for example, the Notification Courier stays at the gate until an approved notification exists.
 
