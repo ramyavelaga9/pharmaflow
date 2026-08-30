@@ -201,6 +201,29 @@ Open:
 
 `npm run setup` is idempotent: rerunning it updates existing resources instead of duplicating them. There is no frontend compilation step; the dashboard is plain HTML, CSS, and JavaScript served by Express.
 
+## Deploy to Railway
+
+The repository includes a production `Dockerfile`, `railway.toml`, and `scripts/start-railway.sh`. Railway runs the dashboard, TrueForge, and both MCP servers in one container so they can share the same persisted workflow data. Only the dashboard port is public.
+
+1. In Railway, choose **New Project → Deploy from GitHub repo** and select this repository and branch.
+2. Add a volume and mount it at `/app/persist`.
+3. Add the environment variable `OPENAI_API_KEY` as a Railway secret.
+4. Generate a public domain for the service. Railway supplies `PORT` automatically; do not set it manually.
+5. Wait for the `/api/health` deployment health check to pass, then open the generated `*.up.railway.app` URL.
+
+Optional variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TRUEFORGE_URL` | `http://127.0.0.1:8790` | Internal TrueForge endpoint |
+| `PHARMAFLOW_MCP_URL` | `http://127.0.0.1:8791/mcp` | Internal PharmaFlow MCP endpoint |
+| `PHARMAFLOW_FDA_MCP_URL` | `http://127.0.0.1:8792/mcp` | Internal FDA MCP endpoint |
+| `PHARMAFLOW_PERSIST_DIR` | `/app/persist` | Railway volume mount |
+
+Do not expose ports `8790`, `8791`, or `8792` publicly. TrueForge and the MCP servers are internal runtime components; browser traffic should enter through the PharmaFlow dashboard only.
+
+The startup script copies seed data into an empty volume once. Existing cases, orders, notifications, recalls, and TrueForge state are retained on later deployments.
+
 ## Tests
 
 ```bash
